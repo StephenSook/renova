@@ -4,18 +4,19 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npm run copy-wasm && vite",
-    "build": "npm run copy-wasm && tsc -b && vite build",
+    "dev": "node scripts/copy-wasm.mjs && node scripts/fetch-ocr-models.mjs && vite",
+    "build": "node scripts/copy-wasm.mjs && node scripts/fetch-ocr-models.mjs && tsc -b && vite build",
     "copy-wasm": "node scripts/copy-wasm.mjs",
     "lint": "oxlint",
     "test": "vitest run",
     "preview": "vite preview",
-    "postinstall": "node scripts/copy-wasm.mjs",
+    "postinstall": "node scripts/copy-wasm.mjs && node scripts/fetch-ocr-models.mjs",
     "eval": "vite-node eval/run.ts"
   },
   "dependencies": {
     "@litert-lm/core": "^0.14.0",
     "@tailwindcss/vite": "^4.3.3",
+    "ppu-paddle-ocr": "^6.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "tailwindcss": "^4.3.3"
