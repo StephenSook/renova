@@ -184,6 +184,24 @@ def train():
     print("\n=== stock checkpoint ===")
     before = _run_probes(model, tokenizer, "before")
 
+    # Gemma 4 wraps many projections in Gemma4ClippableLinear, which peft
+    # refuses to wrap when matched by bare suffix ("q_proj" hits the wrapper).
+    # Target the actual nn.Linear leaves instead, wrapped (...q_proj.linear)
+    # or bare (...q_proj), language stack only: the browser runtime is
+    # text-only and Renova feeds Gemma OCR text rather than pixels, so the
+    # vision and audio towers are irrelevant to what this adapter is for.
+    import re
+
+    proj = r"\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)(\.linear)?$"
+    lora_targets = sorted(
+        name
+        for name, mod in model.named_modules()
+        if isinstance(mod, torch.nn.Linear)
+        and re.search(proj, name)
+        and not any(t in name for t in ("vision", "audio"))
+    )
+    print(f"LoRA targets: {len(lora_targets)} linear layers")
+
     model = get_peft_model(
         model,
         LoraConfig(
@@ -192,11 +210,7 @@ def train():
             lora_dropout=0.0,
             bias="none",
             task_type="CAUSAL_LM",
-            # Language layers only. The browser runtime is text-only and Renova
-            # feeds Gemma OCR text rather than pixels, so the vision and audio
-            # towers are irrelevant to what this adapter is for.
-            target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-                            "gate_proj", "up_proj", "down_proj"],
+            target_modules=lora_targets,
         ),
     )
     model.print_trainable_parameters()
