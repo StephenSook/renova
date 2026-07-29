@@ -168,11 +168,33 @@ export function enforceGlossary(spanishProse: string): {
  * words, and a reader sees a tool that does not really speak their language.
  * When this trips, the caller falls back to the templated rendering.
  */
+const ES_MARKERS =
+  /\b(usted|su|sus|para|que|debe|puede|necesita|documentos|antes|enviar|cobertura|fecha|carta|formulario)\b/gi;
+const EN_MARKERS =
+  /\b(the|you|your|this|need|must|send|before|coverage|letter|documents|deadline|form)\b/gi;
+
 export function isSpanishIntact(text: string): boolean {
   if (!text.trim()) return false;
   // The replacement character means bytes were already lost.
-  if (text.includes('�')) return false;
+  if (text.includes('\uFFFD')) return false;
   // Mojibake signature: UTF-8 read as Latin-1 produces these pairs.
-  if (/[ÃÂ][-¿]/.test(text)) return false;
-  return true;
+  if (/[\u00C3\u00C2][\u00A0-\u00BF]/.test(text)) return false;
+
+  /*
+   * Is it actually Spanish?
+   *
+   * Everything above only proves the bytes survived. A small model given an
+   * English system prompt and an English task line frequently answers in English
+   * anyway, and English prose passes every encoding check. Worse, it then goes
+   * through enforceGlossary, which substitutes terms in place and produces
+   * "You must send comprobante de ingresos before the fecha limite", served to a
+   * Spanish-dominant reader as their explanation.
+   *
+   * Counting markers is crude and sufficient: the two vocabularies do not
+   * overlap, and the fallback when this returns false is the templated
+   * rendering, which is always correct.
+   */
+  const es = (text.match(ES_MARKERS) ?? []).length;
+  const en = (text.match(EN_MARKERS) ?? []).length;
+  return es > en;
 }

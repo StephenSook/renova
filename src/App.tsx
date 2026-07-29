@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Engine } from '@litert-lm/core';
 import {
+  adoptModelFile,
   downloadModel,
   getCachedModel,
   requestPersistence,
@@ -41,6 +42,7 @@ export default function App() {
   const [language, setLanguage] = useState<'en' | 'es'>('en');
   const [error, setError] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
+  const [engineFailed, setEngineFailed] = useState(false);
   const [canSpeak, setCanSpeak] = useState(false);
 
   /**
@@ -64,8 +66,14 @@ export default function App() {
     // OCR is small and is needed on every path, including the one where the
     // reader never downloads the model at all.
     void warmOcr().catch(() => {});
-    void whenVoicesReady().then(() => setCanSpeak(isSpeechAvailable('en')));
+    void whenVoicesReady().then(() => setCanSpeak(isSpeechAvailable(language)));
   }, []);
+
+  // A device can have English voices and no Spanish one. Re-check per language
+  // rather than offering a button that will read Spanish in an English voice.
+  useEffect(() => {
+    setCanSpeak(isSpeechAvailable(language));
+  }, [language]);
 
   // Never leave audio running when the screen changes underneath it.
   useEffect(() => {
@@ -83,7 +91,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (cached && !engine) void warm(cached).catch(() => {});
+    if (cached && !engine) {
+      void warm(cached).catch((err) => {
+        // Silently swallowing this told a user who waited through a 2 GB
+        // download that running without an explanation is how the product works.
+        console.error('[renova] engine warm failed', err);
+        setEngineFailed(true);
+      });
+    }
   }, [cached, engine, warm]);
 
   const onDownload = useCallback(async () => {
@@ -105,7 +120,10 @@ export default function App() {
     if (!file) return;
     setError(null);
     try {
-      setCached(validateModelFile(file));
+      const validated = validateModelFile(file);
+      setCached(validated);
+      // Copy it into OPFS so the USB-stick path works more than once per load.
+      void adoptModelFile(validated).then(setCached).catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -136,8 +154,18 @@ export default function App() {
         }
         setScreen('result');
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        // Raw runtime text ("Aborted(). Build with -sASSERTIONS") is not a
+        // sentence to put in front of a frightened reader. Keep it in the log.
+        console.error('[renova] analyse failed', err);
+        setError(
+          'We could not read those photos. Try again with more light, or with one page at a time.',
+        );
         setScreen(returnTo);
+      } finally {
+        // Without this the navigator queue's button stays disabled and reads
+        // "Reading..." forever, and the only way out is a reload, which erases
+        // every client already processed.
+        setBusy({ stage: 'idle', message: '' });
       }
       // Let the same file be chosen twice in a row, which navigators do.
       e.target.value = '';
@@ -207,7 +235,11 @@ export default function App() {
           <p className="mt-6 text-[1rem] text-slate-text">
             {engine
               ? 'Gemma 4 is loaded on this device. You can turn off your wifi now.'
-              : 'Running without the written explanation. Your deadline and checklist still work.'}
+              : engineFailed
+                ? 'Gemma 4 could not start on this device, so there will be no written explanation. Your deadline, case number, and checklist are read from your document and still work.'
+                : cached
+                  ? 'Gemma 4 is still loading. You can start now; the explanation will appear if it is ready.'
+                  : 'Running without the written explanation. Your deadline and checklist still work.'}
           </p>
 
           <button
@@ -220,12 +252,16 @@ export default function App() {
             I am helping someone else with their packet
           </button>
 
-          {error && (
-            <p role="alert" className="mt-6 rounded border-l-4 border-alert bg-red-50 p-4">
-              {error}
-            </p>
-          )}
         </section>
+      )}
+
+      {error && (
+        <p
+          role="alert"
+          className="mx-auto mt-6 max-w-2xl rounded border-l-4 border-alert bg-red-50 p-4 text-[1.0625rem]"
+        >
+          {error}
+        </p>
       )}
 
       {screen === 'verify' && <Verify onBack={() => setScreen(returnTo)} />}
@@ -277,7 +313,16 @@ export default function App() {
                       return;
                     }
                     setSpeaking(true);
-                    speak(buildScript(analysis, language), language, () => setSpeaking(false));
+                    speak(buildScript(analysis, language), language, (reason) => {
+                      setSpeaking(false);
+                      if (reason === 'error') {
+                        setError(
+                          language === 'es'
+                            ? 'No se pudo reproducir el audio en este dispositivo.'
+                            : 'Audio could not play on this device.',
+                        );
+                      }
+                    });
                   }
                 : undefined
             }

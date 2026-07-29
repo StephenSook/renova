@@ -271,10 +271,21 @@ export function extractDocuments(text: string): RequiredDocument[] {
  * with a phone number. "Call today" rather than "call soon", because the whole
  * problem is that people wait.
  */
-export function buildEscalation(state: StateCode | null, deadlineMissing: boolean): string | null {
+export function buildEscalation(
+  state: StateCode | null,
+  deadlineMissing: boolean,
+  language: 'en' | 'es' = 'en',
+): string | null {
   if (!deadlineMissing) return null;
-  const where = state ? STATES[state].deadlineLocationEn : FEDERAL_FLOOR.deadlineLocationEn;
-  const help = primaryHelpline(state);
+  const rules = state ? STATES[state] : null;
+  const help = primaryHelpline(state, language);
+
+  if (language === 'es') {
+    const where = rules ? rules.deadlineLocationEs : FEDERAL_FLOOR.deadlineLocationEs;
+    return `${where} Si no la encuentra, llame a ${help.name} al ${help.number} hoy mismo.`;
+  }
+
+  const where = rules ? rules.deadlineLocationEn : FEDERAL_FLOOR.deadlineLocationEn;
   return `${where} If you cannot find it, call ${help.name} at ${help.number} today.`;
 }
 

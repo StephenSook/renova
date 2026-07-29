@@ -14,6 +14,7 @@
 import { formatLong } from '../engine/dates';
 import { mismatchMessage } from '../engine/crosscheck';
 import { DOCUMENT_LABELS_ES, ES, EN, programNameEs } from '../engine/glossary';
+import { buildEscalation } from '../engine/rules';
 import { DISCLAIMER_EN, DISCLAIMER_ES, STATES, primaryHelpline } from '../engine/states';
 import { ESCALATE } from '../engine/types';
 import { closingLines, urgency, type Analysis } from '../pipeline';
@@ -69,10 +70,21 @@ export function Result({ analysis, language, onLanguageChange, onSpeak, speaking
       ))}
 
       {analysis.lowQualityPages.length > 0 && (
+        /* Name the photo. "Some photos came out blurry" is unactionable to
+           someone holding five of them. And say what it costs: a hard-to-read
+           page produces a SHORT list, and a short list is invisible as an error. */
         <p className="mb-5 rounded border-l-4 border-warn bg-warn-bg p-4 text-[1rem]">
           {es
-            ? 'Algunas fotos salieron borrosas. Si algo se ve mal, tome la foto otra vez con más luz.'
-            : 'Some photos came out blurry. If anything looks wrong, retake it with more light.'}
+            ? `Fue difícil leer ${
+                analysis.lowQualityPages.length === 1 ? 'la foto' : 'las fotos'
+              } ${analysis.lowQualityPages.map((i) => i + 1).join(', ')}. Puede que falten documentos en la lista de abajo. Tome la foto otra vez con más luz.`
+            : `Photo${analysis.lowQualityPages.length === 1 ? '' : 's'} ${analysis.lowQualityPages
+                .map((i) => i + 1)
+                .join(', ')} ${
+                analysis.lowQualityPages.length === 1 ? 'was' : 'were'
+              } hard to read, so the list below may be missing items. Retake ${
+                analysis.lowQualityPages.length === 1 ? 'it' : 'them'
+              } with more light.`}
         </p>
       )}
 
@@ -85,13 +97,19 @@ export function Result({ analysis, language, onLanguageChange, onSpeak, speaking
         {fields.deadline.value === ESCALATE ? (
           <div className="mt-2">
             <p className="display-sm text-alert">{L.cannotRead}</p>
-            <p className="mt-4 text-[1.125rem]">
-              {es
-                ? fields.state
-                  ? STATES[fields.state].deadlineLocationEn
-                  : ''
-                : fields.escalation}
-            </p>
+            <p className="mt-4 text-[1.125rem]">{buildEscalation(fields.state, true, language)}</p>
+
+            {/* The likeliest reason a deadline is missing is that the reader
+                photographed the form and not the notice that came with it. The
+                engine already knows which states carry it off-form, so say the
+                actionable thing rather than the generic one. */}
+            {fields.missingDeadlineCarrier && (
+              <p className="mt-3 rounded border-l-4 border-gov bg-gov-light p-4 text-[1.0625rem] font-semibold">
+                {es
+                  ? 'Es probable que su fecha límite no esté en el formulario que fotografió. Busque el aviso por separado que vino en el mismo sobre y tómele una foto también.'
+                  : 'Your deadline is probably not on the form you photographed. Look for the separate notice that came in the same envelope and photograph that too.'}
+              </p>
+            )}
             <a
               href={`tel:${help.number.replace(/[^\d+]/g, '')}`}
               className="mt-4 inline-flex min-h-14 items-center rounded bg-alert px-6 text-[1.125rem] font-bold text-white"
@@ -126,11 +144,19 @@ export function Result({ analysis, language, onLanguageChange, onSpeak, speaking
         </p>
       </section>
 
-      {fields.documents.length > 0 && (
-        <section className="mt-9 border-t border-slate-line pt-5">
-          <h2 className="text-[0.9375rem] font-bold uppercase tracking-[0.08em] text-slate-text">
-            {L.documentsLabel}
-          </h2>
+      <section className="mt-9 border-t border-slate-line pt-5">
+        <h2 className="text-[0.9375rem] font-bold uppercase tracking-[0.08em] text-slate-text">
+          {L.documentsLabel}
+        </h2>
+        {fields.documents.length === 0 ? (
+          /* Silence here is dangerous. A missing section reads as "nothing to
+             send", and a packet almost always asks for proof of something. */
+          <p className="mt-3 text-[1.125rem] font-semibold text-alert">
+            {es
+              ? 'No pudimos leer la lista de documentos en estas fotos. Su paquete casi siempre pide comprobantes. Revise el papel o llame al número de abajo.'
+              : 'We could not read the list of documents from these photos. Your packet almost always asks for proof of something. Check the paper, or call the number below.'}
+          </p>
+        ) : (
           <ul className="mt-3 space-y-1">
             {fields.documents.map((doc) => (
               <li key={doc.id}>
@@ -144,10 +170,10 @@ export function Result({ analysis, language, onLanguageChange, onSpeak, speaking
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        )}
+      </section>
 
-      {(analysis.explanationEn || analysis.explanationEs) && (
+      {(analysis.explanationEn || analysis.explanationEs) && !analysis.modelGuessedRefusedField && (
         <section className="mt-9 border-t border-slate-line pt-5">
           <div className="flex items-baseline justify-between gap-4">
             <h2 className="text-[0.9375rem] font-bold uppercase tracking-[0.08em] text-slate-text">
@@ -173,6 +199,22 @@ export function Result({ analysis, language, onLanguageChange, onSpeak, speaking
               {es ? analysis.explanationEs : analysis.explanationEn}
             </p>
           )}
+        </section>
+      )}
+
+      {/* A model failure must look different from a model that was never
+          downloaded. Without this the section is simply absent in both cases,
+          and the reader cannot tell a degradation from a design. */}
+      {(analysis.modelGuessedRefusedField || (analysis.modelError && !analysis.explanationEn)) && (
+        <section className="mt-9 border-t border-slate-line pt-5">
+          <h2 className="text-[0.9375rem] font-bold uppercase tracking-[0.08em] text-slate-text">
+            {es ? 'Qué dice esta carta' : 'What this letter says'}
+          </h2>
+          <p className="mt-3 text-[1.125rem]">
+            {es
+              ? 'La explicación escrita no se pudo generar en este dispositivo. Lo que aparece arriba se leyó directamente de su documento y está completo.'
+              : 'The written explanation could not be produced on this device. What is shown above was read from your document and is complete.'}
+          </p>
         </section>
       )}
 

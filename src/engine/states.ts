@@ -24,6 +24,7 @@ export interface StateRules {
   deadlineCarrier: DeadlineCarrier;
   /** Plain-language sentence naming where to look when no date was found. */
   deadlineLocationEn: string;
+  deadlineLocationEs: string;
   /** Labels that precede a case number, most specific first. */
   caseNumberLabels: string[];
   /** Shape of a valid case number for this state, anchored to a full match. */
@@ -45,6 +46,7 @@ export const STATES: Record<StateCode, StateRules> = {
     // form, as a fill-in line on page 1.
     deadlineCarrier: 'form',
     deadlineLocationEn: 'Your due date is printed on page 1 of your MC 216 form.',
+    deadlineLocationEs: 'Su fecha límite está impresa en la página 1 de su formulario MC 216.',
     caseNumberLabels: ['Case number', 'Case #', 'Case No'],
     caseNumberPattern: /^[A-Z0-9][A-Z0-9-]{4,19}$/i,
     helpline: [
@@ -86,6 +88,8 @@ export const STATES: Record<StateCode, StateRules> = {
     deadlineCarrier: 'notice',
     deadlineLocationEn:
       'Your deadline is not on the renewal form. It is on the separate notice that came with it.',
+    deadlineLocationEs:
+      'Su fecha límite no está en el formulario de renovación. Está en el aviso por separado que vino con él.',
     caseNumberLabels: ['CASE NUMBER', 'Case Number', 'Case #'],
     caseNumberPattern: /^[A-Z]{2}\d{5}[A-Z]$|^[A-Z0-9][A-Z0-9-]{4,19}$/i,
     helpline: [
@@ -122,6 +126,8 @@ export const STATES: Record<StateCode, StateRules> = {
     deadlineCarrier: 'packet',
     deadlineLocationEn:
       'Your due date is printed on the renewal packet that came in the mail, often on the cover.',
+    deadlineLocationEs:
+      'Su fecha límite está impresa en el paquete de renovación que llegó por correo, generalmente en la portada.',
     caseNumberLabels: ['RECORD NUMBER', 'Record Number', 'Record #'],
     caseNumberPattern: /^[A-Z0-9][A-Z0-9-]{4,19}$/i,
     helpline: [
@@ -150,6 +156,8 @@ export const STATES: Record<StateCode, StateRules> = {
     deadlineCarrier: 'notice',
     deadlineLocationEn:
       'Your deadline is on the renewal notice Georgia mailed or emailed you. It is usually the last day of your renewal month.',
+    deadlineLocationEs:
+      'Su fecha límite está en el aviso de renovación que Georgia le envió por correo o correo electrónico. Suele ser el último día de su mes de renovación.',
     caseNumberLabels: ['Client ID', 'Case Number', 'Case ID', 'Gateway ID'],
     caseNumberPattern: /^[A-Z0-9][A-Z0-9-]{4,19}$/i,
     helpline: [
@@ -181,8 +189,9 @@ export const FEDERAL_FLOOR = {
   minimumResponseDays: 30,
   reconsiderationDays: 90,
   advanceNoticeDays: 10,
-  deadlineLocationEn:
-    'Your deadline is on the notice that came with your renewal packet. If you cannot find it, call your state Medicaid office today.',
+  deadlineLocationEn: 'Your deadline is on the notice that came with your renewal packet.',
+  deadlineLocationEs:
+    'Su fecha límite está en el aviso que vino con su paquete de renovación.',
   reconsiderationEn:
     'If you miss the deadline, you usually have 90 days to send the form and get coverage back without reapplying.',
   nationalHelp: [
@@ -217,8 +226,18 @@ export const DISCLAIMER_EN =
 export const DISCLAIMER_ES =
   'Esta herramienta explica su paquete de renovación en lenguaje sencillo. No es asesoramiento legal y no reemplaza la orientación de su oficina estatal de Medicaid. Confirme siempre su fecha límite y los documentos requeridos con su agencia estatal de Medicaid.';
 
-export function primaryHelpline(state: StateCode | null): { name: string; number: string } {
-  if (!state) return { name: 'your state Medicaid office', number: '211' };
+export function primaryHelpline(
+  state: StateCode | null,
+  language: 'en' | 'es' = 'en',
+): { name: string; number: string } {
+  if (!state) {
+    // 211 is the national community resource line. The name is translated
+    // because it is read inside a Spanish sentence; the number never changes.
+    return {
+      name: language === 'es' ? 'su oficina estatal de Medicaid' : 'your state Medicaid office',
+      number: '211',
+    };
+  }
   const first = STATES[state].helpline[0];
   return { name: first.name, number: first.number };
 }

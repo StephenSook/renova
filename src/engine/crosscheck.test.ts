@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { crossCheck, mismatchMessage } from './crosscheck';
 import { enforceGlossary, isSpanishIntact } from './glossary';
-import { extract } from './rules';
+import { buildEscalation, extract } from './rules';
 
 const NY = extract([
   `Renewal for Medicaid DOH-5798
@@ -97,5 +97,40 @@ describe('isSpanishIntact', () => {
     expect(isSpanishIntact('Su fecha l�mite')).toBe(false);
     expect(isSpanishIntact('El aÃ±o pasado')).toBe(false);
     expect(isSpanishIntact('   ')).toBe(false);
+  });
+});
+
+describe('isSpanishIntact, language gate', () => {
+  it('rejects English prose asked for as Spanish', () => {
+    // The dangerous case. English passes every encoding check, then
+    // enforceGlossary substitutes terms in place and produces a hybrid that is
+    // served to a Spanish-dominant reader as their explanation.
+    expect(
+      isSpanishIntact('You must send the documents before the deadline to keep your coverage.'),
+    ).toBe(false);
+  });
+
+  it('accepts real Spanish', () => {
+    expect(
+      isSpanishIntact('Usted debe enviar los documentos antes de la fecha límite para mantener su cobertura.'),
+    ).toBe(true);
+  });
+});
+
+describe('buildEscalation, bilingual', () => {
+  it('never returns English text for a Spanish reader', () => {
+    for (const state of ['CA', 'NY', 'PA', 'GA', null] as const) {
+      const es = buildEscalation(state, true, 'es');
+      expect(es).toBeTruthy();
+      expect(es!.length).toBeGreaterThan(20);
+      // Words that would only appear if the English string leaked through.
+      expect(es!).not.toMatch(/\b(your|deadline|renewal form|notice that came)\b/i);
+      expect(es!.toLowerCase()).toContain('llame');
+    }
+  });
+
+  it('still carries a phone number in both languages', () => {
+    expect(buildEscalation('NY', true, 'es')).toContain('1-800-541-2831');
+    expect(buildEscalation('NY', true, 'en')).toContain('1-800-541-2831');
   });
 });

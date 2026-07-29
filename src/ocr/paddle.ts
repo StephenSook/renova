@@ -65,7 +65,19 @@ export function warmOcr(): Promise<PaddleOcrService> {
   if (servicePromise) return servicePromise;
 
   servicePromise = (async () => {
-    const service = new PaddleOcrService({ model: MODEL });
+    const service = new PaddleOcrService({
+      model: MODEL,
+      /*
+       * See low-confidence lines rather than having them removed upstream.
+       *
+       * The library filters at 0.5 by default, before anything here runs. That
+       * makes a blurry page look BETTER, not worse: weak lines are deleted from
+       * the array, so the mean confidence of the survivors goes up while the
+       * text needed for the checklist silently disappears. Lowering the floor
+       * lets isLowQuality() below see the damage and warn the reader.
+       */
+      recognition: { minimumConfidence: 0.3 } as never,
+    });
     await service.initialize();
     return service;
   })();
@@ -137,7 +149,24 @@ export async function readPages(images: (Blob | ArrayBuffer)[]): Promise<OcrPage
  * rules engine still refuses on its own terms.
  */
 export function isLowQuality(page: OcrPage): boolean {
-  return page.lines.length < 3 || page.confidence < 0.55;
+  /*
+   * Thresholds measured, not guessed.
+   *
+   * Clean renders of the four demo packets read at 10 to 13 lines, 0.99 mean
+   * confidence, and zero weak lines. An earlier version required at least 12
+   * lines and flagged three of those four, which is worse than no warning at
+   * all: a banner that cries wolf on a legible page teaches people to ignore it
+   * on the page that matters. Line count turned out to be the wrong instrument
+   * anyway, because a cover notice is legitimately short.
+   *
+   * The real signal is the proportion of weakly-recognized lines. That only
+   * became visible after lowering the library's own 0.5 pre-filter above;
+   * before that, blur deleted lines rather than lowering the average, so
+   * degradation made a page look better.
+   */
+  if (page.lines.length < 4) return true;
+  const weak = page.lines.filter((l) => l.confidence < 0.65).length;
+  return weak / page.lines.length > 0.25 || page.confidence < 0.85;
 }
 
 function meanConfidence(lines: OcrLine[]): number {
@@ -145,18 +174,17 @@ function meanConfidence(lines: OcrLine[]): number {
   return lines.reduce((sum, l) => sum + l.confidence, 0) / lines.length;
 }
 
-/** PP-OCR returns a polygon. Reduce it to the rectangle the UI can highlight. */
+/**
+ * Normalise the bounding box.
+ *
+ * The library returns `{ x, y, width, height }`, not a polygon. An earlier
+ * version here branched on `Array.isArray` and therefore returned null for every
+ * line, which harmed nothing yet because no view draws boxes, and would have
+ * silently defeated highlighting the moment one did.
+ */
 function toRect(box: unknown): OcrLine['box'] {
-  const points = Array.isArray(box)
-    ? (box as unknown[]).filter(
-        (p): p is [number, number] => Array.isArray(p) && p.length >= 2,
-      )
-    : [];
-  if (points.length < 2) return null;
-
-  const xs = points.map((p) => p[0]);
-  const ys = points.map((p) => p[1]);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+  if (!box || typeof box !== 'object') return null;
+  const b = box as Partial<Record<'x' | 'y' | 'width' | 'height', number>>;
+  if ([b.x, b.y, b.width, b.height].some((n) => typeof n !== 'number')) return null;
+  return { x: b.x!, y: b.y!, width: b.width!, height: b.height! };
 }
