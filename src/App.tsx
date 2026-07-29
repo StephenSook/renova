@@ -24,6 +24,7 @@ import { warmOcr } from './ocr/paddle';
 import { analyse, type Analysis, type Progress } from './pipeline';
 import { buildScript, isSpeechAvailable, speak, stop, whenVoicesReady } from './tts/speak';
 import { Landing } from './views/Landing';
+import { AskQuestion } from './views/AskQuestion';
 import { NavigatorQueue, type QueueEntry } from './views/Navigator';
 import { Result } from './views/Result';
 import { Verify } from './views/Verify';
@@ -59,6 +60,7 @@ export default function App() {
 
   const modelInput = useRef<HTMLInputElement>(null);
   const photoInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void checkWebGpu().then((s) => setWebGpu(s.supported));
@@ -217,6 +219,18 @@ export default function App() {
         onChange={onPhotos}
         className="hidden"
       />
+      {/* Separate input with capture set. On a phone this opens the camera
+          directly; the one above opens the photo library. A person standing at
+          a kitchen table with the packet in front of them wants the camera. */}
+      <input
+        ref={cameraInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        onChange={onPhotos}
+        className="hidden"
+      />
 
       {screen === 'capture' && (
         <section className="mx-auto max-w-2xl px-5 py-14">
@@ -227,10 +241,16 @@ export default function App() {
           </p>
 
           <button
-            onClick={() => photoInput.current?.click()}
+            onClick={() => cameraInput.current?.click()}
             className="mt-8 min-h-16 w-full rounded bg-gov px-8 text-[1.25rem] font-bold text-white"
           >
-            Choose photos
+            Take a photo
+          </button>
+          <button
+            onClick={() => photoInput.current?.click()}
+            className="mt-3 min-h-14 w-full rounded border-2 border-gov px-8 text-[1.0625rem] font-semibold text-gov"
+          >
+            Choose photos I already took
           </button>
           <p className="mt-6 text-[1rem] text-slate-text">
             {engine
@@ -327,7 +347,10 @@ export default function App() {
                 : undefined
             }
           />
-          <div className="mx-auto max-w-2xl px-5 pb-16 no-print">
+          <div className="mx-auto max-w-2xl px-5">
+            <AskQuestion analysis={analysis} engine={engine} language={language} />
+          </div>
+          <div className="mx-auto max-w-2xl px-5 pb-16 pt-8 no-print">
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => window.print()}

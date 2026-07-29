@@ -11,6 +11,7 @@
  * is rendered from constants. The model's prose sits in one clearly bounded
  * block and nowhere else.
  */
+import { buildIcs, icsFilename } from '../engine/calendar';
 import { formatLong } from '../engine/dates';
 import { mismatchMessage } from '../engine/crosscheck';
 import { DOCUMENT_LABELS_ES, ES, EN, programNameEs } from '../engine/glossary';
@@ -127,6 +128,25 @@ export function Result({ analysis, language, onLanguageChange, onSpeak, speaking
             >
               {days !== null ? L.daysLeft(days) : ''}
             </p>
+
+            {/* The one thing that leaves the screen with the person. Everything
+                else here is information; this is the deadline in their pocket,
+                with a reminder a week out, built on the device. */}
+            <button
+              onClick={() => {
+                const ics = buildIcs(fields, { language });
+                if (!ics) return;
+                const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = icsFilename(fields);
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="mt-4 min-h-14 rounded-full border-2 border-gov px-6 text-[1.0625rem] font-semibold text-gov no-print"
+            >
+              {es ? 'Agregar a mi calendario' : 'Add this to my calendar'}
+            </button>
           </div>
         )}
       </section>
