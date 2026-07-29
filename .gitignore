@@ -63,3 +63,9 @@ public/litertlm-wasm/
 # Local scratch
 BREAKAGES.md
 tmp/
+.env*
+
+# Screenshot captures. Reference captures of third-party sites are studied
+# locally and never redistributed; our own production screenshots are
+# regenerated on demand by scripts/shot.mjs.
+shots/
