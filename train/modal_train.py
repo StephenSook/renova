@@ -43,6 +43,8 @@ image = (
         "accelerate",
         "datasets",
         "huggingface_hub",
+        # Gemma4Processor imports PIL even for text-only work.
+        "pillow",
     )
     .add_local_dir("train/data", remote_path="/data")
 )
@@ -231,6 +233,9 @@ def train():
 
     trainer = SFTTrainer(
         model=model,
+        # Text-only run: hand SFTTrainer the tokenizer so it does not build
+        # the multimodal Gemma4Processor.
+        processing_class=tokenizer,
         train_dataset=data["train"],
         eval_dataset=data["validation"],
         args=SFTConfig(
