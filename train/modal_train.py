@@ -138,13 +138,16 @@ def _run_probes(model, tokenizer, tag):
     results = []
     model.eval()
     for probe in PROBES:
-        ids = tokenizer.apply_chat_template(
+        # transformers 5.x returns a BatchEncoding here, not a bare tensor
+        enc = tokenizer.apply_chat_template(
             [{"role": "user", "content": probe["prompt"]}],
             add_generation_prompt=True,
             return_tensors="pt",
+            return_dict=True,
         ).to("cuda")
-        out = model.generate(input_ids=ids, max_new_tokens=180, do_sample=False)
-        text = tokenizer.decode(out[0][ids.shape[1]:], skip_special_tokens=True).strip()
+        out = model.generate(**enc, max_new_tokens=180, do_sample=False)
+        prompt_len = enc["input_ids"].shape[1]
+        text = tokenizer.decode(out[0][prompt_len:], skip_special_tokens=True).strip()
         ok = not probe["fail"](text)
         print(f"  [{tag}] {'pass' if ok else 'FAIL'}  {probe['name']}")
         results.append({"probe": probe["name"], "pass": ok, "output": text[:400]})
