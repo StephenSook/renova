@@ -60,6 +60,15 @@ public/litertlm-wasm/
 *calibration*
 *.pdf
 
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Trained LoRA adapter (~96 MB weights plus tokenizer): published to Hugging
+# Face as its own artifact, never committed here. eval.json is force-added as
+# the before/after evidence.
+train/adapter/
+
 # Local scratch
 BREAKAGES.md
 tmp/
