@@ -10,7 +10,8 @@
     "lint": "oxlint",
     "test": "vitest run",
     "preview": "vite preview",
-    "postinstall": "node scripts/copy-wasm.mjs"
+    "postinstall": "node scripts/copy-wasm.mjs",
+    "eval": "vite-node eval/run.ts"
   },
   "dependencies": {
     "@litert-lm/core": "^0.14.0",
@@ -28,6 +29,7 @@
     "playwright": "^1.62.0",
     "typescript": "~6.0.2",
     "vite": "^8.1.1",
+    "vite-node": "^6.0.0",
     "vitest": "^4.1.10"
   }
 }

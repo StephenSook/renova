@@ -85,7 +85,18 @@ const DOCUMENT_RULES: DocumentRule[] = [
   {
     id: 'unearned-income',
     label: 'Award letters for Social Security, unemployment, pension, or VA benefits',
-    triggers: [/\baward\s+letters?\b/i, /\bsocial\s+security\b/i, /\bunemployment\b/i, /\bpension\b/i, /\bbenefits?\s+letters?\b/i],
+    triggers: [
+      /\baward\s+letters?\b/i,
+      /\bsocial\s+security\b/i,
+      /\bunemployment\b/i,
+      /\bpension\b/i,
+      /\bbenefits?\s+letters?\b/i,
+      // Georgia asks for this without naming any source: "Proof of any income
+      // you receive other than by working."
+      /\bincome\s+you\s+receive\b/i,
+      /\bproof\s+of\s+any\s+income\b/i,
+      /\bunearned\s+income\b/i,
+    ],
   },
   {
     id: 'loss-of-income',
