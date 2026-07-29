@@ -11,7 +11,8 @@
     "test": "vitest run",
     "preview": "vite preview",
     "postinstall": "node scripts/copy-wasm.mjs && node scripts/fetch-ocr-models.mjs && node scripts/fetch-fonts.mjs",
-    "eval": "vite-node eval/run.ts"
+    "eval": "vite-node eval/run.ts",
+    "assert-offline": "node scripts/assert-offline.mjs"
   },
   "dependencies": {
     "@litert-lm/core": "^0.14.0",

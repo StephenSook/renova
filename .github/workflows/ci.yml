@@ -62,18 +62,19 @@ jobs:
           done
           echo "all self-hosted runtime assets present"
 
-      # No absolute CDN URLs in shipped JavaScript. This is the regression guard
-      # for the bug the app's own verification screen caught: onnxruntime-web
-      # fetching its runtime from jsdelivr, which broke the offline claim while
-      # every test still passed.
-      - name: Assert no CDN references in the bundle
-        run: |
-          set -e
-          if grep -rlE "https://(cdn\.jsdelivr\.net|unpkg\.com|cdnjs\.cloudflare\.com)" dist/assets/ 2>/dev/null; then
-            echo "A CDN URL reached the bundle. The offline claim would be false."
-            exit 1
-          fi
-          echo "no CDN references in dist/assets"
+      - name: Install a browser for the offline assertion
+        run: npx playwright install --with-deps chromium
+
+      # The offline claim, tested rather than asserted: serve the build, load it
+      # in a real browser, drive OCR, and fail on any request to another host.
+      #
+      # This replaced a grep for CDN URLs in the bundle. That grep failed on its
+      # first run and was right to, but for the wrong reason: both @litert-lm/core
+      # and onnxruntime-web carry their CDN defaults as string constants and we
+      # override both at runtime. A grep cannot tell a dead default from a live
+      # fetch. This can.
+      - name: Assert zero external requests
+        run: node scripts/assert-offline.mjs
 
       # Model weights must never be committed. Gemma is fetched or side-loaded.
       - name: Assert no model weights committed
