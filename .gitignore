@@ -1,0 +1,65 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+coverage
+*.tsbuildinfo
+.eslintcache
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+.AppleDouble
+._*
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Deploy
+.vercel
+
+# Model weights are never committed. They are fetched from Hugging Face at
+# runtime or side-loaded from disk via the file picker.
+*.litertlm
+*.task
+*.onnx
+*.gguf
+*.bin
+*.safetensors
+# ...except the self-hosted OCR models, which must ship for the offline claim.
+!public/models/ocr/*.onnx
+
+# LiteRT-LM wasm runtime (~102 MB) is copied out of node_modules by
+# scripts/copy-wasm.mjs on install and build. Self-hosted at runtime so the app
+# starts offline, but never committed.
+public/litertlm-wasm/
+
+# Private planning material must never enter this public repo.
+# Strategy docs, judge recon, and win calibration live in ~/dev/Gemma Hacks only.
+*Build_Plan*
+*recon*
+*Recon*
+*calibration*
+*.pdf
+
+# Local scratch
+BREAKAGES.md
+tmp/

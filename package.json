@@ -1,0 +1,32 @@
+{
+  "name": "renova",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run copy-wasm && vite",
+    "build": "npm run copy-wasm && tsc -b && vite build",
+    "copy-wasm": "node scripts/copy-wasm.mjs",
+    "lint": "oxlint",
+    "test": "vitest run",
+    "preview": "vite preview",
+    "postinstall": "node scripts/copy-wasm.mjs"
+  },
+  "dependencies": {
+    "@litert-lm/core": "^0.14.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "oxlint": "^1.71.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "vitest": "^4.1.10"
+  }
+}

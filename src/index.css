@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/*
+ * Accessibility floor for the whole app, set once here rather than per component.
+ *
+ * The readers this is built for are often low-vision, often reading in their
+ * second language, and often on a phone. 18px body is the project minimum, not
+ * a default to be overridden, and focus must always be visible because some of
+ * these users navigate entirely by keyboard or switch device.
+ */
+:root {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 18px;
+  line-height: 1.6;
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: #fff;
+}
+
+:focus-visible {
+  outline: 3px solid #1a4480;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
