@@ -26,9 +26,21 @@ image = (
     .apt_install("git")
     # Unsloth pulls its own pinned torch/transformers/trl set. Installing it
     # alone avoids the resolver fights that come from pinning them separately.
+    # Plain Hugging Face stack, no Unsloth.
+    #
+    # Unsloth was the obvious choice and cost two failed runs. It resolves
+    # transformers==4.57.2, which predates the gemma4 architecture entirely
+    # ("Transformers does not recognize this architecture"), and pinning its own
+    # stated ceiling of 5.5.0 then breaks its patching layer with
+    # "NameError: auto_docstring is not defined". Its declared support range is
+    # aspirational. peft plus trl has fewer moving parts and no patching layer
+    # to fight the transformers version.
     .pip_install(
-        "unsloth",
-        "unsloth_zoo",
+        "torch",
+        "transformers>=5.5.0",
+        "peft",
+        "trl",
+        "accelerate",
         "datasets",
         "huggingface_hub",
     )
@@ -49,9 +61,13 @@ def smoke():
     bf16 = torch.cuda.is_bf16_supported()
     print(f"[smoke] {name}, {total:.1f} GB, bf16={bf16}, torch {torch.__version__}")
 
-    import unsloth  # noqa: F401
+    import transformers, peft, trl
 
-    print("[smoke] unsloth imports")
+    print(f"[smoke] transformers {transformers.__version__}, peft {peft.__version__}, trl {trl.__version__}")
+    from transformers import AutoConfig
+
+    cfg = AutoConfig.from_pretrained(MODEL)
+    print(f"[smoke] {MODEL} model_type={cfg.model_type} recognised")
     return {"gpu": name, "gb": round(total, 1), "bf16": bf16}
 
 
@@ -119,10 +135,8 @@ PROBES = [
 
 
 def _run_probes(model, tokenizer, tag):
-    from unsloth import FastLanguageModel
-
-    FastLanguageModel.for_inference(model)
     results = []
+    model.eval()
     for probe in PROBES:
         ids = tokenizer.apply_chat_template(
             [{"role": "user", "content": probe["prompt"]}],
@@ -140,49 +154,49 @@ def _run_probes(model, tokenizer, tag):
 @app.function(
     image=image,
     gpu="A10G",
-    # Ampere gives bf16, which Unsloth's own notes call out as the difference
-    # between a comfortable run and a slow fp32 one on a T4.
+    # Ampere gives native bf16 and 24 GB, which holds ~10 GB of bf16 weights
+    # plus activations under gradient checkpointing with room to spare.
     timeout=60 * 60,
     volumes={"/out": volume},
 )
 def train():
     import json, os, torch
-    from unsloth import FastLanguageModel, get_chat_template
-    from unsloth.chat_templates import train_on_responses_only
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from peft import LoraConfig, get_peft_model
     from datasets import load_dataset
     from trl import SFTTrainer, SFTConfig
 
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=MODEL,
-        max_seq_length=MAX_SEQ,
-        # 16-bit. Merging from a 4-bit base is a known source of quality loss,
-        # and this adapter is meant to be merged later.
-        load_in_4bit=False,
-        dtype=None,
+    tokenizer = AutoTokenizer.from_pretrained(MODEL)
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL,
+        dtype=torch.bfloat16,
+        device_map="cuda",
+        attn_implementation="eager",
     )
-    tokenizer = get_chat_template(tokenizer, "gemma-4")
+    print(f"loaded {MODEL}, {sum(p.numel() for p in model.parameters())/1e9:.2f}B params")
 
-    # BEFORE. Without this the "after" number is a bare score rather than a
-    # comparison, and a bare score on four probes says almost nothing.
+    # BEFORE, on the stock weights, in this container on this GPU. A bare
+    # after-score on four probes says almost nothing; a before and after says
+    # whether the training did anything.
     print("\n=== stock checkpoint ===")
     before = _run_probes(model, tokenizer, "before")
 
-    model = FastLanguageModel.get_peft_model(
+    model = get_peft_model(
         model,
-        r=16,
-        lora_alpha=16,
-        lora_dropout=0.0,
-        bias="none",
-        # Language layers only. The browser runtime is text-only and Renova
-        # feeds Gemma OCR text rather than pixels, so the vision and audio
-        # towers are irrelevant here.
-        finetune_vision_layers=False,
-        finetune_language_layers=True,
-        finetune_attention_modules=True,
-        finetune_mlp_modules=True,
-        use_gradient_checkpointing="unsloth",
-        random_state=3407,
+        LoraConfig(
+            r=16,
+            lora_alpha=16,
+            lora_dropout=0.0,
+            bias="none",
+            task_type="CAUSAL_LM",
+            # Language layers only. The browser runtime is text-only and Renova
+            # feeds Gemma OCR text rather than pixels, so the vision and audio
+            # towers are irrelevant to what this adapter is for.
+            target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
+                            "gate_proj", "up_proj", "down_proj"],
+        ),
     )
+    model.print_trainable_parameters()
 
     data = load_dataset(
         "json",
@@ -193,43 +207,35 @@ def train():
             "text": tokenizer.apply_chat_template(
                 row["messages"], tokenize=False, add_generation_prompt=False
             )
-        }
+        },
+        remove_columns=["messages"],
     )
     print(f"train {len(data['train'])}  validation {len(data['validation'])}")
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
         train_dataset=data["train"],
         eval_dataset=data["validation"],
         args=SFTConfig(
-            dataset_text_field="text",
-            max_seq_length=MAX_SEQ,
-            per_device_train_batch_size=2,
-            gradient_accumulation_steps=4,
+            max_length=MAX_SEQ,
+            per_device_train_batch_size=1,
+            gradient_accumulation_steps=8,
+            gradient_checkpointing=True,
             warmup_ratio=0.05,
             num_train_epochs=2,
             learning_rate=2e-4,
-            fp16=not torch.cuda.is_bf16_supported(),
-            bf16=torch.cuda.is_bf16_supported(),
+            bf16=True,
             logging_steps=10,
             eval_strategy="steps",
             eval_steps=60,
-            optim="adamw_8bit",
+            optim="adamw_torch",
             weight_decay=0.01,
             lr_scheduler_type="cosine",
             seed=3407,
             output_dir="/tmp/outputs",
             report_to="none",
+            save_strategy="no",
         ),
-    )
-
-    # Train on the assistant turn only. Otherwise most of the gradient goes into
-    # reproducing our own prompt, which the model never needs to generate.
-    trainer = train_on_responses_only(
-        trainer,
-        instruction_part="<start_of_turn>user\n",
-        response_part="<start_of_turn>model\n",
     )
 
     stats = trainer.train()
