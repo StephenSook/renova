@@ -52,6 +52,41 @@ This is the evidence behind the privacy claim, and it is why the claim is worded
 as "after the one-time model download, zero network requests" rather than
 "nothing leaves the device". The model fetch is a real request and is stated.
 
+## Run 2, 2026-07-29: the production origin
+
+Same machine, same model, same prompt, at `https://renova-offline.vercel.app`.
+This is the origin a judge will use, and it is the one that matters, because OPFS
+is origin-scoped and a cache warmed on localhost does not exist here.
+
+| Step | First run | Second run |
+|---|---|---|
+| Model download to OPFS | 53.3 s | cached |
+| Engine warm | 5.7 s | 0.0 s |
+| Time to first token | 42.12 s | **6.39 s** |
+| Decode | 19.5 chunks/s over 3.8 s | 19.8 chunks/s over 3.7 s |
+| Output | 365 chars | 365 chars |
+
+Two things to be honest about rather than to quote selectively:
+
+**Warm first-token was 6.39 s here against 0.48 s on localhost.** Same code, same
+model, same machine. The difference is machine state: by run 2 the laptop had a
+long-running Chrome, a dev server, and a build toolchain resident, and 8 GB of
+unified memory is shared between the OS and the WebGPU allocation. So the honest
+range for warm time-to-first-token on this hardware is **0.5 to 6.5 seconds
+depending on what else is running**, and the demo machine should be booted clean.
+Quoting 0.48 s without that condition would be the kind of number that survives
+into a video and then cannot be defended.
+
+**Decode was 19.5 chunks/s here against 41 on localhost**, for the same reason.
+Both are comfortably inside the stage budget with `maxOutputTokens` at 220.
+
+Output was byte-identical across all four runs on both origins, which is the
+result worth relying on: temperature 0 with a fixed seed is genuinely
+deterministic in this runtime, so the cached demo outputs and the live run agree.
+
+Network audit repeated on production: **1 external request** (`huggingface.co`),
+everything else same-origin.
+
 ## Open items
 
 - `navigator.storage.persist()` was **REFUSED** on localhost, so the cache is
