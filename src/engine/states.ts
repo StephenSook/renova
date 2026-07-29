@@ -206,8 +206,16 @@ export const NINETY_DAY_SENTENCE_EN =
 export const DISCLAIMER_EN =
   'This tool explains your renewal packet in plain language. It is not legal advice and does not replace guidance from your state Medicaid office. Always confirm your deadline and required documents with your state Medicaid agency.';
 
+/**
+ * Accents are correct here on purpose.
+ *
+ * The source research stripped diacritics, and "renovacion" is not a word.
+ * Shipping it tells a Spanish-dominant reader immediately that nobody who speaks
+ * the language checked, which is precisely the impression this product cannot
+ * afford to give.
+ */
 export const DISCLAIMER_ES =
-  'Esta herramienta explica su paquete de renovacion en lenguaje sencillo. No es asesoramiento legal y no reemplaza la orientacion de su oficina estatal de Medicaid.';
+  'Esta herramienta explica su paquete de renovación en lenguaje sencillo. No es asesoramiento legal y no reemplaza la orientación de su oficina estatal de Medicaid. Confirme siempre su fecha límite y los documentos requeridos con su agencia estatal de Medicaid.';
 
 export function primaryHelpline(state: StateCode | null): { name: string; number: string } {
   if (!state) return { name: 'your state Medicaid office', number: '211' };

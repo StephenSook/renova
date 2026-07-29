@@ -1,30 +1,212 @@
 @import "tailwindcss";
 
 /*
- * Accessibility floor for the whole app, set once here rather than per component.
+ * Renova design system.
  *
- * The readers this is built for are often low-vision, often reading in their
- * second language, and often on a phone. 18px body is the project minimum, not
- * a default to be overridden, and focus must always be visible because some of
- * these users navigate entirely by keyboard or switch device.
+ * One idea holds both surfaces together: the letter is the light source.
+ *
+ * The landing is nearly black, and the only warmth in the composition leaks out
+ * from behind a document. As the model downloads, that light grows. The tool is
+ * where the light has won: full paper white, calm, and set in the typeface the
+ * federal government uses for benefits material, because this product's job is
+ * to translate officialdom without abandoning its authority.
+ *
+ * Both typefaces are self-hosted. A Google Fonts link would be a third-party
+ * request on a page that tells the reader nothing leaves their device, and fonts
+ * are a fingerprinting surface, which is the wrong thing to hand people who are
+ * afraid of leaving a trail.
  */
+
+@font-face {
+  font-family: "Public Sans";
+  src: url("/fonts/public-sans.woff2") format("woff2");
+  font-weight: 300 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/fonts/bricolage.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+@theme {
+  /* Ink and paper. */
+  --color-ink: #131313;
+  --color-ink-soft: #1c1b1a;
+  --color-paper: #ffffff;
+
+  /* The light. Warm, because the product's whole argument is that the letter
+     is survivable, and cold light would say the opposite. */
+  --color-glow: #f5a623;
+  --color-glow-deep: #b4700c;
+
+  /* U.S. Web Design System base tokens, used verbatim on the tool surface so it
+     reads as an official document rather than as an app about one. */
+  --color-gov: #1a4480;
+  --color-gov-dark: #162e51;
+  --color-gov-light: #d9e8f6;
+  --color-alert: #b50909;
+  --color-warn: #ffbe2e;
+  --color-warn-bg: #faf3d1;
+  --color-ok: #00a91c;
+
+  --color-slate-line: #dfe1e2;
+  --color-slate-text: #565c65;
+
+  --font-display: "Bricolage Grotesque", "Public Sans", sans-serif;
+  --font-sans: "Public Sans", system-ui, sans-serif;
+}
+
 :root {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* 18px floor, not a default to be overridden. The readers this is built for
+     are frequently low-vision and frequently reading in a second language. */
   font-size: 18px;
-  line-height: 1.6;
+  line-height: 1.55;
+  font-family: var(--font-sans);
   color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   margin: 0;
-  background: #fff;
+  background: var(--color-paper);
+  color: var(--color-ink);
 }
 
+/* Visible on everything interactive, at 3:1 against both surfaces. */
 :focus-visible {
-  outline: 3px solid #1a4480;
-  outline-offset: 2px;
+  outline: 3px solid var(--color-gov);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
+.on-ink :focus-visible {
+  outline-color: var(--color-glow);
+}
+
+/*
+ * Display type.
+ *
+ * The reference sets 104px at -3.12px tracking, about -0.03em. Clamped here so
+ * it holds its proportions from a phone to a projector, since this gets demoed
+ * on both.
+ */
+.display {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 11vw, 7.5rem);
+  line-height: 0.94;
+  letter-spacing: -0.035em;
+  font-weight: 420;
+}
+
+.display-sm {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 4.6vw, 3rem);
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+  font-weight: 440;
+}
+
+/* The number that counts a 2 GB download up to 100. Tabular so it does not
+   jitter, which is the difference between a progress bar and a heartbeat. */
+.counter {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.05em;
+  font-weight: 300;
+}
+
+/*
+ * Film grain.
+ *
+ * An SVG turbulence filter rather than an image, so it costs no request and
+ * stays crisp at any density. It sits over the dark surface only; grain on the
+ * tool surface would fight legibility.
+ */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.16;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+}
+
+/*
+ * The light behind the document.
+ *
+ * Kept low in the frame and deliberately weak. A first pass had it centred and
+ * near-full opacity, and it washed the whole viewport to near-white: beautiful
+ * for about one second, and completely unreadable, which on a tool for
+ * low-vision readers is the worst possible failure. Atmosphere is not allowed to
+ * cost contrast here, so the glow lives below the text and a scrim sits over it.
+ */
+.glow {
+  background: radial-gradient(
+    ellipse 34% 20% at 50% 97%,
+    color-mix(in oklab, var(--color-glow) 40%, transparent) 0%,
+    color-mix(in oklab, var(--color-glow-deep) 18%, transparent) 45%,
+    transparent 75%
+  );
+  filter: blur(58px);
+}
+
+/*
+ * Keeps the whole field dark enough for white text at any glow level.
+ *
+ * Without this the glow washed the lower half of the viewport to cream and the
+ * headline vanished into it. Contrast wins over atmosphere every time here.
+ */
+.scrim {
+  background: linear-gradient(
+    to bottom,
+    var(--color-ink) 0%,
+    color-mix(in oklab, var(--color-ink) 92%, transparent) 55%,
+    color-mix(in oklab, var(--color-ink) 78%, transparent) 100%
+  );
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Scroll-revealed sections. Set by IntersectionObserver rather than by a
+   library, because a scroll library and a 2 GB model both want this GPU. */
+.reveal {
+  opacity: 0;
+  transform: translateY(2rem);
+  transition:
+    opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal[data-shown="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/*
+ * Everything above is decoration and must be able to vanish.
+ *
+ * This is not a nicety here. Vestibular disorders are common in the population
+ * this serves, and motion sickness while reading a coverage deadline is a real
+ * harm.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -33,5 +215,27 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Print. Navigators hand the checklist to the client on paper, so this is a
+   real output surface, not an afterthought. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  :root {
+    font-size: 12pt;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
   }
 }

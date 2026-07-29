@@ -1,255 +1,212 @@
 /**
- * GATE W spike.
+ * The whole application.
  *
- * This screen exists to answer four questions with numbers before any product
- * code is written, and it is throwaway:
+ * Two surfaces, one URL, one piece of state: whether the reader has a packet in
+ * front of them yet. There is no router because there are no routes; adding one
+ * would be a second thing to break in a room with bad wifi.
  *
- *   1. Does the model download and commit to OPFS at this exact origin?
- *   2. Does it load again after a reload with the network off?
- *   3. What is time-to-first-token, and what is the sustained decode rate?
- *   4. Does the whole thing fit on an 8 GB machine with headroom?
- *
- * Numbers printed here go into the writeup's architecture section, so they are
- * measured rather than estimated.
+ * The model is warmed as early as it is allowed to be. Loading 2 GB onto the GPU
+ * and compiling its shaders takes tens of seconds on first use, and doing that
+ * lazily puts the whole cost between a person pressing a button and seeing
+ * anything happen.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Engine } from '@litert-lm/core';
 import {
-  MODEL_BYTES,
-  clearCachedModel,
   downloadModel,
   getCachedModel,
-  isOpfsSupported,
   requestPersistence,
   validateModelFile,
-  type DownloadProgress,
 } from './model/cache';
-import { checkWebGpu, disposeEngine, generate, warmEngine, type WebGpuStatus } from './model/engine';
+import { checkWebGpu, warmEngine } from './model/engine';
+import { warmOcr } from './ocr/paddle';
+import { analyse, type Analysis, type Progress } from './pipeline';
+import { Landing } from './views/Landing';
+import { Result } from './views/Result';
 
-const GB = (n: number) => `${(n / 1024 ** 3).toFixed(2)} GB`;
-const MBs = (n: number) => `${(n / 1024 ** 2).toFixed(1)} MB/s`;
-
-const PROBE_PROMPT =
-  'Explain in three short sentences, at a sixth grade reading level, what a Medicaid renewal packet is and why the deadline on it matters.';
-
-type Phase = 'idle' | 'downloading' | 'warming' | 'ready' | 'generating' | 'error';
+type Screen = 'landing' | 'capture' | 'working' | 'result';
 
 export default function App() {
-  const [gpu, setGpu] = useState<WebGpuStatus | null>(null);
-  const [persisted, setPersisted] = useState<boolean | null>(null);
+  const [screen, setScreen] = useState<Screen>('landing');
+  const [webGpu, setWebGpu] = useState(true);
   const [cached, setCached] = useState<File | null>(null);
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [engine, setEngine] = useState<Engine | null>(null);
+  const [busy, setBusy] = useState<Progress>({ stage: 'idle', message: '' });
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [language, setLanguage] = useState<'en' | 'es'>('en');
   const [error, setError] = useState<string | null>(null);
-  const [output, setOutput] = useState('');
-  const [metrics, setMetrics] = useState<Record<string, string>>({});
-  const fileInput = useRef<HTMLInputElement>(null);
+
+  const modelInput = useRef<HTMLInputElement>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    void checkWebGpu().then(setGpu);
+    void checkWebGpu().then((s) => setWebGpu(s.supported));
     void getCachedModel().then(setCached);
-    navigator.storage?.persisted?.().then(setPersisted).catch(() => {});
+    // OCR is small and is needed on every path, including the one where the
+    // reader never downloads the model at all.
+    void warmOcr().catch(() => {});
   }, []);
 
-  const note = useCallback((k: string, v: string) => {
-    setMetrics((m) => ({ ...m, [k]: v }));
+  /** Warm the engine, and prime it once so the first real answer is not the slow one. */
+  const warm = useCallback(async (model: File) => {
+    const e = await warmEngine(model);
+    setEngine(e);
+    return e;
   }, []);
+
+  useEffect(() => {
+    if (cached && !engine) void warm(cached).catch(() => {});
+  }, [cached, engine, warm]);
 
   const onDownload = useCallback(async () => {
     setError(null);
-    setPhase('downloading');
+    setDownloading(true);
     try {
-      const granted = await requestPersistence();
-      setPersisted(granted);
-      note('storage.persist()', granted ? 'granted' : 'REFUSED (cache may be evicted)');
-
-      const t0 = performance.now();
-      const file = await downloadModel(setProgress);
-      note('download', `${((performance.now() - t0) / 1000).toFixed(1)}s`);
+      await requestPersistence();
+      const file = await downloadModel((p) => setProgress(p.fraction));
       setCached(file);
-      setPhase('idle');
     } catch (err) {
-      setError(String(err));
-      setPhase('error');
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDownloading(false);
     }
-  }, [note]);
-
-  const onPickFile = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setError(null);
-      try {
-        setCached(validateModelFile(file));
-        note('model source', `local file (${file.name})`);
-      } catch (err) {
-        setError(String(err));
-      }
-    },
-    [note],
-  );
-
-  const onRun = useCallback(async () => {
-    if (!cached) return;
-    setError(null);
-    setOutput('');
-    setPhase('warming');
-    try {
-      const tWarm = performance.now();
-      const engine = await warmEngine(cached);
-      note('engine warm', `${((performance.now() - tWarm) / 1000).toFixed(1)}s`);
-
-      setPhase('generating');
-      const tGen = performance.now();
-      let first = 0;
-      let chunks = 0;
-
-      const text = await generate(engine, PROBE_PROMPT, {
-        onToken: (t) => {
-          if (!first) {
-            first = performance.now();
-            note('time to first token', `${((first - tGen) / 1000).toFixed(2)}s`);
-          }
-          chunks += 1;
-          setOutput((o) => o + t);
-        },
-      });
-
-      const seconds = (performance.now() - (first || tGen)) / 1000;
-      // Chunk count is a lower bound on token count. Labelled as chunks so it
-      // can never be quoted as a tokens/second figure by accident.
-      note('decode rate', `${(chunks / seconds).toFixed(1)} chunks/s over ${seconds.toFixed(1)}s`);
-      note('output chars', String(text.length));
-      setPhase('ready');
-    } catch (err) {
-      setError(String(err));
-      setPhase('error');
-    }
-  }, [cached, note]);
-
-  const onClear = useCallback(async () => {
-    await disposeEngine();
-    await clearCachedModel();
-    setCached(null);
-    setOutput('');
-    setMetrics({});
-    setPhase('idle');
   }, []);
 
-  const busy = phase === 'downloading' || phase === 'warming' || phase === 'generating';
+  const onPickModel = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    try {
+      setCached(validateModelFile(file));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
 
-  return (
-    <main className="mx-auto max-w-3xl p-8 text-slate-900">
-      <h1 className="text-2xl font-bold">Renova spike: GATE W</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        Gemma 4 E2B on WebGPU, cached in OPFS, at origin <code>{location.origin}</code>
-      </p>
+  const onPhotos = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = [...(e.target.files ?? [])];
+      if (!files.length) return;
+      setError(null);
+      setScreen('working');
+      try {
+        const result = await analyse(files, { engine, onProgress: setBusy });
+        setAnalysis(result);
+        setScreen('result');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        setScreen('capture');
+      }
+    },
+    [engine],
+  );
 
-      <section className="mt-6 space-y-1 rounded border border-slate-300 p-4 text-sm">
-        <Row label="WebGPU">
-          {gpu === null
-            ? 'checking...'
-            : gpu.supported
-              ? `yes${gpu.adapterInfo ? ` (${gpu.adapterInfo})` : ''}`
-              : `NO — ${gpu.reason}`}
-        </Row>
-        <Row label="OPFS">{isOpfsSupported() ? 'yes' : 'NO'}</Row>
-        <Row label="Storage persisted">
-          {persisted === null ? 'unknown' : persisted ? 'yes' : 'no'}
-        </Row>
-        <Row label="Model cached">
-          {cached ? `yes, ${GB(cached.size)} (byte-exact)` : `no, needs ${GB(MODEL_BYTES)}`}
-        </Row>
-      </section>
-
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          onClick={onDownload}
-          disabled={busy || !!cached}
-          className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-40"
-        >
-          Download model
-        </button>
-        <button
-          onClick={() => fileInput.current?.click()}
-          disabled={busy}
-          className="rounded border border-slate-400 px-4 py-2 disabled:opacity-40"
-        >
-          Load from disk
-        </button>
+  if (screen === 'landing') {
+    return (
+      <>
+        <Landing
+          progress={progress}
+          downloading={downloading}
+          cached={!!cached}
+          webGpu={webGpu}
+          onStart={onDownload}
+          onPickFile={() => modelInput.current?.click()}
+          onSkip={() => setScreen('capture')}
+        />
         <input
-          ref={fileInput}
+          ref={modelInput}
           type="file"
           accept=".litertlm"
-          onChange={onPickFile}
+          onChange={onPickModel}
           className="hidden"
         />
-        <button
-          onClick={onRun}
-          disabled={busy || !cached}
-          className="rounded bg-emerald-700 px-4 py-2 text-white disabled:opacity-40"
-        >
-          Warm and generate
-        </button>
-        <button
-          onClick={onClear}
-          disabled={busy}
-          className="rounded border border-red-400 px-4 py-2 text-red-700 disabled:opacity-40"
-        >
-          Clear cache
-        </button>
+        {error && (
+          <p role="alert" className="fixed inset-x-0 bottom-0 z-50 bg-alert p-4 text-white">
+            {error}
+          </p>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <div className="min-h-dvh">
+      <div aria-live="polite" className="sr-only">
+        {busy.message}
       </div>
 
-      {progress && phase === 'downloading' && (
-        <div className="mt-4">
-          <div className="h-2 w-full overflow-hidden rounded bg-slate-200">
-            <div
-              className="h-full bg-slate-900 transition-[width]"
-              style={{ width: `${progress.fraction * 100}%` }}
-            />
-          </div>
-          <p className="mt-1 text-sm tabular-nums text-slate-600">
-            {GB(progress.receivedBytes)} / {GB(progress.totalBytes)},{' '}
-            {(progress.fraction * 100).toFixed(1)}%, {MBs(progress.bytesPerSecond)}
+      {screen === 'capture' && (
+        <section className="mx-auto max-w-2xl px-5 py-14">
+          <h1 className="display-sm">Photograph your packet</h1>
+          <p className="mt-4 max-w-[52ch] text-[1.125rem] text-slate-text">
+            Take a picture of every page you have, including the cover notice that came with it.
+            The deadline is often on the notice rather than on the form.
           </p>
-        </div>
-      )}
 
-      {phase === 'warming' && <p className="mt-4 text-sm">Loading weights onto the GPU...</p>}
+          <button
+            onClick={() => photoInput.current?.click()}
+            className="mt-8 min-h-16 w-full rounded bg-gov px-8 text-[1.25rem] font-bold text-white"
+          >
+            Choose photos
+          </button>
+          <input
+            ref={photoInput}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={onPhotos}
+            className="hidden"
+          />
 
-      {error && (
-        <pre className="mt-4 overflow-x-auto rounded bg-red-50 p-3 text-sm text-red-800">
-          {error}
-        </pre>
-      )}
+          <p className="mt-6 text-[1rem] text-slate-text">
+            {engine
+              ? 'Gemma 4 is loaded on this device. You can turn off your wifi now.'
+              : 'Running without the written explanation. Your deadline and checklist still work.'}
+          </p>
 
-      {output && (
-        <pre className="mt-4 whitespace-pre-wrap rounded bg-slate-50 p-3 text-sm">{output}</pre>
-      )}
-
-      {Object.keys(metrics).length > 0 && (
-        <section className="mt-6">
-          <h2 className="font-semibold">Measurements</h2>
-          <table className="mt-2 text-sm">
-            <tbody>
-              {Object.entries(metrics).map(([k, v]) => (
-                <tr key={k}>
-                  <td className="pr-6 text-slate-600">{k}</td>
-                  <td className="tabular-nums">{v}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {error && (
+            <p role="alert" className="mt-6 rounded border-l-4 border-alert bg-red-50 p-4">
+              {error}
+            </p>
+          )}
         </section>
       )}
-    </main>
-  );
-}
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <span className="text-slate-600">{label}</span>
-      <span className="text-right font-medium">{children}</span>
+      {screen === 'working' && (
+        <section className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center px-5">
+          <p className="display-sm">{busy.message}</p>
+          <p className="mt-4 text-[1.125rem] text-slate-text">
+            This is happening on your device. Nothing is being uploaded.
+          </p>
+        </section>
+      )}
+
+      {screen === 'result' && analysis && (
+        <>
+          <Result analysis={analysis} language={language} onLanguageChange={setLanguage} />
+          <div className="mx-auto max-w-2xl px-5 pb-16 no-print">
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => window.print()}
+                className="min-h-14 rounded-full border-2 border-gov px-7 text-[1.0625rem] font-semibold text-gov"
+              >
+                {language === 'es' ? 'Imprimir la lista' : 'Print the checklist'}
+              </button>
+              <button
+                onClick={() => {
+                  setAnalysis(null);
+                  setScreen('capture');
+                }}
+                className="min-h-14 rounded-full px-7 text-[1.0625rem] text-slate-text underline"
+              >
+                {language === 'es' ? 'Leer otro paquete' : 'Read another packet'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
