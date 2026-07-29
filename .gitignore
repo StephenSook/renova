@@ -69,3 +69,7 @@ tmp/
 # locally and never redistributed; our own production screenshots are
 # regenerated on demand by scripts/shot.mjs.
 shots/
+
+# onnxruntime wasm, copied from node_modules by scripts/copy-wasm.mjs so the
+# app never fetches its runtime from a CDN. Not committed.
+public/ort/

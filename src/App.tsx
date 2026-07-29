@@ -24,8 +24,9 @@ import { analyse, type Analysis, type Progress } from './pipeline';
 import { Landing } from './views/Landing';
 import { NavigatorQueue, type QueueEntry } from './views/Navigator';
 import { Result } from './views/Result';
+import { Verify } from './views/Verify';
 
-type Screen = 'landing' | 'capture' | 'working' | 'result' | 'navigator';
+type Screen = 'landing' | 'capture' | 'working' | 'result' | 'navigator' | 'verify';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('landing');
@@ -215,6 +216,8 @@ export default function App() {
         </section>
       )}
 
+      {screen === 'verify' && <Verify onBack={() => setScreen(returnTo)} />}
+
       {screen === 'navigator' && (
         <NavigatorQueue
           queue={queue}
@@ -265,6 +268,12 @@ export default function App() {
                   : language === 'es'
                     ? 'Leer otro paquete'
                     : 'Read another packet'}
+              </button>
+              <button
+                onClick={() => setScreen('verify')}
+                className="min-h-14 rounded-full px-7 text-[1.0625rem] text-slate-text underline"
+              >
+                {language === 'es' ? 'Cómo se mantiene honesto' : 'How this stays honest'}
               </button>
             </div>
           </div>

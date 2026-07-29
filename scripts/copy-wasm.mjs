@@ -35,3 +35,44 @@ for (const f of files) total += (await stat(join(dest, f))).size;
 console.log(
   `[copy-wasm] ${files.length} files, ${(total / 1024 / 1024).toFixed(1)} MB -> public/litertlm-wasm/`,
 );
+
+/*
+ * onnxruntime-web has the same problem and it is easier to miss, because it is a
+ * transitive dependency nobody configured. Left alone it fetches its wasm from
+ * cdn.jsdelivr.net at runtime, which was caught by the app's own verification
+ * screen showing an external host on a page that promises none.
+ *
+ * Only the variants the browser can actually select are copied. The full dist is
+ * 128 MB and most of it is builds for capabilities we never use.
+ */
+const ortSrc = join(root, 'node_modules', 'onnxruntime-web', 'dist');
+const ortDest = join(root, 'public', 'ort');
+
+if (existsSync(ortSrc)) {
+  await mkdir(ortDest, { recursive: true });
+  const wanted = [
+    // WebGPU / JSEP path, which is what this app takes when WebGPU is present.
+    'ort-wasm-simd-threaded.jsep.mjs',
+    'ort-wasm-simd-threaded.jsep.wasm',
+    // Plain SIMD threaded, the wasm fallback when WebGPU is unavailable. That
+    // fallback is the whole reason the deterministic path still works without a
+    // GPU, so it has to be self-hosted too.
+    'ort-wasm-simd-threaded.mjs',
+    'ort-wasm-simd-threaded.wasm',
+  ];
+
+  let ortTotal = 0;
+  for (const name of wanted) {
+    const from = join(ortSrc, name);
+    if (!existsSync(from)) {
+      console.error(`[copy-wasm] missing ${name} in onnxruntime-web/dist`);
+      process.exit(1);
+    }
+    await cp(from, join(ortDest, name));
+    ortTotal += (await stat(from)).size;
+  }
+
+  console.log(
+    `[copy-wasm] ${wanted.length} files, ${(ortTotal / 1024 / 1024).toFixed(1)} MB -> public/ort/`,
+  );
+}

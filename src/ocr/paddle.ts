@@ -13,7 +13,23 @@
  * dropping an accent inside a case number or a document name is a silent
  * corruption nobody downstream can detect.
  */
+import { env } from 'onnxruntime-web';
 import { PaddleOcrService, isWebGpuAvailable } from 'ppu-paddle-ocr/web';
+
+/**
+ * Serve onnxruntime's own wasm from this origin.
+ *
+ * Left at its default, onnxruntime-web fetches its runtime from
+ * cdn.jsdelivr.net the first time a session is created. It is a transitive
+ * dependency, so nothing in this codebase asks for it and nothing in the build
+ * output shows it; the app's own verification screen is what surfaced it, by
+ * reporting an external host on a page that promises none.
+ *
+ * Two consequences if this line is removed: OCR cannot initialize in airplane
+ * mode, and a judge watching the Network tab sees a CDN request while being told
+ * nothing leaves the device.
+ */
+env.wasm.wasmPaths = `${import.meta.env.BASE_URL}ort/`;
 
 const MODEL = {
   detection: `${import.meta.env.BASE_URL}models/ocr/det.onnx`,
