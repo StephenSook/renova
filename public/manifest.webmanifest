@@ -1,0 +1,28 @@
+{
+  "name": "Renova, Medicaid renewal reader",
+  "short_name": "Renova",
+  "description": "Photograph a Medicaid renewal packet and get the deadline, the case number, and what to send, in plain English and Spanish. Runs entirely on your device.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#131313",
+  "theme_color": "#131313",
+  "orientation": "portrait-primary",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["health", "utilities"],
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

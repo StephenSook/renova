@@ -2,9 +2,34 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>renova</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <title>Renova, read your Medicaid renewal packet on your own device</title>
+    <meta
+      name="description"
+      content="Photograph a Medicaid renewal packet and get the deadline, the case number, and exactly what to send, in plain English and Spanish. Gemma 4 runs in your own browser. Nothing you photograph leaves your device."
+    />
+
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
+
+    <!--
+      Installing the app is not a nicety here. Chrome refuses
+      navigator.storage.persist() for an ordinary page, which leaves the 2 GB
+      cached model evictable under storage pressure. An installed app is granted
+      persistence, so installing is what makes "it still works next week with the
+      wifi off" true rather than hopeful.
+    -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#131313" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Dark first paint, so opening the page never flashes white. -->
+    <style>
+      html {
+        background: #131313;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

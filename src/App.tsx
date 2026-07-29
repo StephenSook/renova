@@ -22,9 +22,10 @@ import { checkWebGpu, warmEngine } from './model/engine';
 import { warmOcr } from './ocr/paddle';
 import { analyse, type Analysis, type Progress } from './pipeline';
 import { Landing } from './views/Landing';
+import { NavigatorQueue, type QueueEntry } from './views/Navigator';
 import { Result } from './views/Result';
 
-type Screen = 'landing' | 'capture' | 'working' | 'result';
+type Screen = 'landing' | 'capture' | 'working' | 'result' | 'navigator';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('landing');
@@ -37,6 +38,18 @@ export default function App() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [language, setLanguage] = useState<'en' | 'es'>('en');
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Navigator queue. Memory only, deliberately.
+   *
+   * This is a list of other people's case numbers on what is often a shared
+   * laptop in a community room. Persisting it would be the single worst thing
+   * this product could do, so a refresh erases it and that is stated on screen.
+   */
+  const [queue, setQueue] = useState<QueueEntry[]>([]);
+  const [returnTo, setReturnTo] = useState<Screen>('capture');
+  const startedAt = useRef(0);
+  const pendingLabel = useRef('');
 
   const modelInput = useRef<HTMLInputElement>(null);
   const photoInput = useRef<HTMLInputElement>(null);
@@ -90,17 +103,33 @@ export default function App() {
       const files = [...(e.target.files ?? [])];
       if (!files.length) return;
       setError(null);
+      startedAt.current = performance.now();
       setScreen('working');
       try {
         const result = await analyse(files, { engine, onProgress: setBusy });
+        const seconds = (performance.now() - startedAt.current) / 1000;
         setAnalysis(result);
+
+        if (returnTo === 'navigator') {
+          setQueue((q) => [
+            {
+              id: `${q.length + 1}-${Math.round(seconds * 1000)}`,
+              label: pendingLabel.current || `Packet ${q.length + 1}`,
+              analysis: result,
+              seconds,
+            },
+            ...q,
+          ]);
+        }
         setScreen('result');
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
-        setScreen('capture');
+        setScreen(returnTo);
       }
+      // Let the same file be chosen twice in a row, which navigators do.
+      e.target.value = '';
     },
-    [engine],
+    [engine, returnTo],
   );
 
   if (screen === 'landing') {
@@ -137,6 +166,17 @@ export default function App() {
         {busy.message}
       </div>
 
+      {/* Mounted once, outside the screen switch, because both the reader flow
+          and navigator mode open it. */}
+      <input
+        ref={photoInput}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={onPhotos}
+        className="hidden"
+      />
+
       {screen === 'capture' && (
         <section className="mx-auto max-w-2xl px-5 py-14">
           <h1 className="display-sm">Photograph your packet</h1>
@@ -151,20 +191,21 @@ export default function App() {
           >
             Choose photos
           </button>
-          <input
-            ref={photoInput}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={onPhotos}
-            className="hidden"
-          />
-
           <p className="mt-6 text-[1rem] text-slate-text">
             {engine
               ? 'Gemma 4 is loaded on this device. You can turn off your wifi now.'
               : 'Running without the written explanation. Your deadline and checklist still work.'}
           </p>
+
+          <button
+            onClick={() => {
+              setReturnTo('navigator');
+              setScreen('navigator');
+            }}
+            className="mt-8 text-[1rem] text-gov underline"
+          >
+            I am helping someone else with their packet
+          </button>
 
           {error && (
             <p role="alert" className="mt-6 rounded border-l-4 border-alert bg-red-50 p-4">
@@ -172,6 +213,24 @@ export default function App() {
             </p>
           )}
         </section>
+      )}
+
+      {screen === 'navigator' && (
+        <NavigatorQueue
+          queue={queue}
+          busy={busy.stage !== 'idle' && busy.stage !== 'done'}
+          onAdd={() => {
+            const input = document.getElementById('client-label') as HTMLInputElement | null;
+            pendingLabel.current = input?.value.trim() ?? '';
+            if (input) input.value = '';
+            photoInput.current?.click();
+          }}
+          onOpen={(entry) => {
+            setAnalysis(entry.analysis);
+            setScreen('result');
+          }}
+          onClear={() => setQueue([])}
+        />
       )}
 
       {screen === 'working' && (
@@ -197,11 +256,15 @@ export default function App() {
               <button
                 onClick={() => {
                   setAnalysis(null);
-                  setScreen('capture');
+                  setScreen(returnTo);
                 }}
                 className="min-h-14 rounded-full px-7 text-[1.0625rem] text-slate-text underline"
               >
-                {language === 'es' ? 'Leer otro paquete' : 'Read another packet'}
+                {returnTo === 'navigator'
+                  ? 'Back to the list'
+                  : language === 'es'
+                    ? 'Leer otro paquete'
+                    : 'Read another packet'}
               </button>
             </div>
           </div>

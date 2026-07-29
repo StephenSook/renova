@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Renova">
+  <!--
+    An envelope with light coming out of it. The product's whole argument in one
+    mark: the letter people are afraid to open is the thing that lights the way.
+  -->
+  <rect width="512" height="512" fill="#131313"/>
+  <defs>
+    <radialGradient id="g" cx="50%" cy="46%" r="46%">
+      <stop offset="0%" stop-color="#f5a623" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#b4700c" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#131313" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="256" cy="256" r="150" fill="url(#g)"/>
+  <g fill="none" stroke="#ffffff" stroke-width="22" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="136" y="192" width="240" height="166" rx="14"/>
+    <path d="M136 210 L256 296 L376 210"/>
+  </g>
+</svg>
