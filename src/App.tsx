@@ -21,6 +21,7 @@ import {
 import { checkWebGpu, warmEngine } from './model/engine';
 import { warmOcr } from './ocr/paddle';
 import { analyse, type Analysis, type Progress } from './pipeline';
+import { buildScript, isSpeechAvailable, speak, stop, whenVoicesReady } from './tts/speak';
 import { Landing } from './views/Landing';
 import { NavigatorQueue, type QueueEntry } from './views/Navigator';
 import { Result } from './views/Result';
@@ -39,6 +40,8 @@ export default function App() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [language, setLanguage] = useState<'en' | 'es'>('en');
   const [error, setError] = useState<string | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+  const [canSpeak, setCanSpeak] = useState(false);
 
   /**
    * Navigator queue. Memory only, deliberately.
@@ -61,7 +64,16 @@ export default function App() {
     // OCR is small and is needed on every path, including the one where the
     // reader never downloads the model at all.
     void warmOcr().catch(() => {});
+    void whenVoicesReady().then(() => setCanSpeak(isSpeechAvailable('en')));
   }, []);
+
+  // Never leave audio running when the screen changes underneath it.
+  useEffect(() => {
+    if (screen !== 'result') {
+      stop();
+      setSpeaking(false);
+    }
+  }, [screen]);
 
   /** Warm the engine, and prime it once so the first real answer is not the slow one. */
   const warm = useCallback(async (model: File) => {
@@ -247,7 +259,29 @@ export default function App() {
 
       {screen === 'result' && analysis && (
         <>
-          <Result analysis={analysis} language={language} onLanguageChange={setLanguage} />
+          <Result
+            analysis={analysis}
+            language={language}
+            onLanguageChange={(next) => {
+              stop();
+              setSpeaking(false);
+              setLanguage(next);
+            }}
+            speaking={speaking}
+            onSpeak={
+              canSpeak
+                ? () => {
+                    if (speaking) {
+                      stop();
+                      setSpeaking(false);
+                      return;
+                    }
+                    setSpeaking(true);
+                    speak(buildScript(analysis, language), language, () => setSpeaking(false));
+                  }
+                : undefined
+            }
+          />
           <div className="mx-auto max-w-2xl px-5 pb-16 no-print">
             <div className="flex flex-wrap gap-3">
               <button
