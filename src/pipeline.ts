@@ -10,6 +10,7 @@
  */
 import type { Engine } from '@litert-lm/core';
 import { crossCheck, type Mismatch } from './engine/crosscheck';
+import { mergeMismatches } from './engine/prose';
 import { daysUntil } from './engine/dates';
 import { ES, enforceGlossary, isSpanishIntact } from './engine/glossary';
 import { SYSTEM_PROMPT, buildPrompt } from './engine/prompt';
@@ -62,6 +63,12 @@ export interface Analysis {
   lowQualityPages: number[];
   /** Whether Gemma ran at all. False means the deterministic result stands alone. */
   modelRan: boolean;
+  /**
+   * The prose came from the demo cache rather than a live generation. The
+   * reader is told so on screen; a saved answer presented as a live one would
+   * be a lie on a page whose whole argument is checkability.
+   */
+  proseFromCache: boolean;
   timings: Record<string, number>;
 }
 
@@ -111,6 +118,7 @@ export async function analyse(
     modelError: null,
     lowQualityPages,
     modelRan: false,
+    proseFromCache: false,
     timings,
   };
 
@@ -191,11 +199,7 @@ export async function analyse(
   return analysis;
 }
 
-/** One banner per field, first sighting wins, so a reader is never shown the same disagreement twice. */
-function mergeMismatches(a: Mismatch[], b: Mismatch[]): Mismatch[] {
-  const seen = new Set(a.map((m) => m.field));
-  return [...a, ...b.filter((m) => !seen.has(m.field))];
-}
+export { applyCachedProse } from './engine/prose';
 
 /**
  * The closing lines, rendered from code in both languages.

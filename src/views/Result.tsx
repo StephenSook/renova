@@ -219,6 +219,17 @@ export function Result({ analysis, language, onLanguageChange, onSpeak, speaking
               {es ? analysis.explanationEs : analysis.explanationEn}
             </p>
           )}
+
+          {/* A saved answer presented as a live one would be a lie on a page
+              whose whole argument is checkability. Say where the prose came
+              from, and how to get the live version. */}
+          {analysis.proseFromCache && !(es && analysis.spanishFellBack) && (
+            <p className="mt-4 rounded border-l-4 border-slate-line bg-gov-light p-4 text-[0.9375rem] text-slate-text">
+              {es
+                ? 'Esta explicación es una respuesta guardada del propio motor Gemma 4 de esta aplicación, registrada antes con la misma configuración fija que usa en vivo. Descargue el modelo en la primera pantalla para generarla en su dispositivo.'
+                : "This explanation is a saved answer from this app's own Gemma 4 engine, recorded earlier at the same fixed settings it uses live. Download the model on the first screen to run it on your device."}
+            </p>
+          )}
         </section>
       )}
 

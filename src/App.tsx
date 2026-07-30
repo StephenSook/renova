@@ -21,7 +21,9 @@ import {
 } from './model/cache';
 import { checkWebGpu, warmEngine } from './model/engine';
 import { warmOcr } from './ocr/paddle';
-import { analyse, type Analysis, type Progress } from './pipeline';
+import { DEMO_CACHE } from './demo/cached';
+import { DEMO_SCENARIOS, type DemoScenario } from './demo/scenarios';
+import { analyse, applyCachedProse, type Analysis, type Progress } from './pipeline';
 import { buildScript, isSpeechAvailable, speak, stop, whenVoicesReady } from './tts/speak';
 import { Landing } from './views/Landing';
 import { AskQuestion } from './views/AskQuestion';
@@ -64,7 +66,11 @@ export default function App() {
 
   useEffect(() => {
     void checkWebGpu().then((s) => setWebGpu(s.supported));
-    void getCachedModel().then(setCached);
+    // Dev-only: ?nomodel simulates a visitor who never downloaded the model,
+    // which is exactly the audience the demo cache exists for.
+    const noModel =
+      import.meta.env.DEV && new URLSearchParams(location.search).has('nomodel');
+    if (!noModel) void getCachedModel().then(setCached);
     // OCR is small and is needed on every path, including the one where the
     // reader never downloads the model at all.
     void warmOcr().catch(() => {});
@@ -175,6 +181,42 @@ export default function App() {
     [engine, returnTo],
   );
 
+  const onDemo = useCallback(
+    async (scenario: DemoScenario) => {
+      setError(null);
+      startedAt.current = performance.now();
+      setScreen('working');
+      try {
+        const blobs = await Promise.all(
+          scenario.images.map(async (url) => {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+            return res.blob();
+          }),
+        );
+        let result = await analyse(blobs, { engine, onProgress: setBusy });
+        // No model on this device: show the saved answer this same engine
+        // produced for these exact pages, labelled on screen as saved. The
+        // fields above the prose were still read live, just now.
+        if (!result.modelRan) {
+          const cached = DEMO_CACHE.scenarios[scenario.id];
+          if (cached) result = applyCachedProse(result, cached);
+        }
+        setAnalysis(result);
+        setScreen('result');
+      } catch (err) {
+        console.error('[renova] demo failed', err);
+        setError(
+          'The sample packet could not be loaded. Try again, or photograph your own packet.',
+        );
+        setScreen('capture');
+      } finally {
+        setBusy({ stage: 'idle', message: '' });
+      }
+    },
+    [engine],
+  );
+
   if (screen === 'landing') {
     return (
       <>
@@ -261,6 +303,30 @@ export default function App() {
                   ? 'Gemma 4 is still loading. You can start now; the explanation will appear if it is ready.'
                   : 'Running without the written explanation. Your deadline and checklist still work.'}
           </p>
+
+          <div className="mt-10 border-t border-slate-line pt-6">
+            <h2 className="text-[0.9375rem] font-bold uppercase tracking-[0.08em] text-slate-text">
+              No packet in front of you? Try a sample
+            </h2>
+            <p className="mt-2 text-[1rem] text-slate-text">
+              Synthetic documents in the states' real formats. Invented values, nobody's mail.
+            </p>
+            <ul className="mt-4 space-y-3">
+              {DEMO_SCENARIOS.map((s) => (
+                <li key={s.id}>
+                  <button
+                    onClick={() => void onDemo(s)}
+                    className="min-h-14 w-full rounded border-2 border-slate-line px-5 py-3 text-left hover:border-gov"
+                  >
+                    <span className="block text-[1.0625rem] font-semibold">{s.label}</span>
+                    <span className="mt-1 block text-[0.9375rem] text-slate-text">
+                      {s.description}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
 
           <button
             onClick={() => {
