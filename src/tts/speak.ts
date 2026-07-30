@@ -7,10 +7,13 @@
  * Kokoro would sound better. It also costs 86 to 155 MB of weights, a second
  * onnxruntime session competing for the same 8 GB of unified memory the language
  * model is already using, and another fetch from Hugging Face on a page whose
- * verification screen now reports zero external requests. `speechSynthesis` is
- * zero bytes, genuinely offline (macOS, Windows, Android and iOS all ship
- * Spanish voices locally), costs no memory, and for a reader with low vision it
- * speaks in the voice their device already uses for everything else.
+ * verification screen now reports zero external requests. The disqualifying
+ * fact, checked against kokoro-js 1.2.1: it ships American and British English
+ * voices only, so the one reader this product centers, the Spanish-dominant
+ * one, is the one reader it could not serve. `speechSynthesis` is zero bytes,
+ * genuinely offline (macOS, Windows, Android and iOS all ship Spanish voices
+ * locally), costs no memory, and for a reader with low vision it speaks in the
+ * voice their device already uses for everything else.
  *
  * What is read is chosen carefully. Not the whole page: the deadline, how long
  * is left, the case number, what to send, and the 90-day right. Those are the
