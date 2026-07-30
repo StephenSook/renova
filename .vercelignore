@@ -1,0 +1,7 @@
+# Keep multi-GB local artifacts and non-build dirs out of deploy uploads.
+# scripts/ and package files must ship: postinstall vendors wasm and models.
+train/
+shots/
+ios/
+docs/
+bench/
