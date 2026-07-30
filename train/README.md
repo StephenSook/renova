@@ -1,7 +1,8 @@
 # Fine-tuning Gemma 4 E2B for Renova
 
 A LoRA that teaches the model three behaviours the stock checkpoint does not
-have, each one measured by the project's eval harness.
+have, each one measured by the project's eval harness. Published, with its
+evaluation, at https://huggingface.co/ssookra/renova-gemma4-e2b-lora.
 
 ## What runs where, stated plainly
 
