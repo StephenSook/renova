@@ -99,6 +99,9 @@ The same capability honesty applies natively: phones with less than 7 GB of RAM
 are never offered the model download, because a 4 GB iPhone cannot hold the
 engine. They run the deterministic reader and the labelled sample explanations.
 
+Install the beta on any iPhone (iOS 17+) through TestFlight:
+[testflight.apple.com/join/Z9UJTn1Y](https://testflight.apple.com/join/Z9UJTn1Y).
+
 ```bash
 brew install xcodegen
 npm run ios:engine        # bundle the rules engine + demo assets for JSC
