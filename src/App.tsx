@@ -35,7 +35,10 @@ type Screen = 'landing' | 'capture' | 'working' | 'result' | 'navigator' | 'veri
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('landing');
-  const [webGpu, setWebGpu] = useState(true);
+  const [gpu, setGpu] = useState<{ supported: boolean; modelFits: boolean }>({
+    supported: true,
+    modelFits: true,
+  });
   const [cached, setCached] = useState<File | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -65,7 +68,7 @@ export default function App() {
   const cameraInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    void checkWebGpu().then((s) => setWebGpu(s.supported));
+    void checkWebGpu().then((s) => setGpu({ supported: s.supported, modelFits: s.modelFits }));
     // Dev-only: ?nomodel simulates a visitor who never downloaded the model,
     // which is exactly the audience the demo cache exists for.
     const noModel =
@@ -99,7 +102,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (cached && !engine) {
+    // Never warm on a device whose adapter cannot hold the model: the attempt
+    // does not error, it kills the tab.
+    if (cached && !engine && gpu.modelFits) {
       void warm(cached).catch((err) => {
         // Silently swallowing this told a user who waited through a 2 GB
         // download that running without an explanation is how the product works.
@@ -107,7 +112,7 @@ export default function App() {
         setEngineFailed(true);
       });
     }
-  }, [cached, engine, warm]);
+  }, [cached, engine, gpu.modelFits, warm]);
 
   const onDownload = useCallback(async () => {
     setError(null);
@@ -224,7 +229,8 @@ export default function App() {
           progress={progress}
           downloading={downloading}
           cached={!!cached}
-          webGpu={webGpu}
+          webGpu={gpu.supported}
+          modelFits={gpu.modelFits}
           onStart={onDownload}
           onPickFile={() => modelInput.current?.click()}
           onSkip={() => setScreen('capture')}

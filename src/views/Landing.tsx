@@ -23,6 +23,11 @@ interface Props {
   downloading: boolean;
   cached: boolean;
   webGpu: boolean;
+  /**
+   * The adapter can hold the 2 GB model. False on iPhones, which report
+   * WebGPU and then jetsam the tab; they must never be offered the download.
+   */
+  modelFits: boolean;
   onStart: () => void;
   onPickFile: () => void;
   onSkip: () => void;
@@ -33,6 +38,7 @@ export function Landing({
   downloading,
   cached,
   webGpu,
+  modelFits,
   onStart,
   onPickFile,
   onSkip,
@@ -85,7 +91,7 @@ export function Landing({
           Renova
         </span>
         <span className="rounded-full border border-white/20 bg-black/30 px-4 py-2 text-[0.875rem] backdrop-blur">
-          {cached ? 'On this device' : webGpu ? 'Runs in this browser' : 'Reader mode'}
+          {cached ? 'On this device' : webGpu && modelFits ? 'Runs in this browser' : 'Reader mode'}
         </span>
       </header>
 
@@ -114,6 +120,7 @@ export function Landing({
               downloading={downloading}
               cached={cached}
               webGpu={webGpu}
+              modelFits={modelFits}
               onStart={onStart}
               onPickFile={onPickFile}
               onSkip={onSkip}
@@ -162,6 +169,7 @@ function ModelGate({
   downloading,
   cached,
   webGpu,
+  modelFits,
   onStart,
   onPickFile,
   onSkip,
@@ -172,6 +180,28 @@ function ModelGate({
         <p className="text-[1.0625rem] text-white/70">
           This browser cannot run the model, so the written explanation is unavailable. The deadline,
           the case number, and the checklist still work, because those are never generated.
+        </p>
+        <button
+          onClick={onSkip}
+          className="mt-5 min-h-14 rounded-full bg-white px-8 text-[1.0625rem] font-semibold text-ink"
+        >
+          Read my packet anyway
+        </button>
+      </div>
+    );
+  }
+
+  /* WebGPU is present but the adapter cannot hold 2 GB in one piece, which is
+     every iPhone. Offering the download here ends with a dead tab after a long
+     wait, so the honest move is to say so before a byte moves. */
+  if (!modelFits) {
+    return (
+      <div className="max-w-[54ch]">
+        <p className="text-[1.0625rem] text-white/70">
+          This device caps browser GPU memory below what the 2 GB model needs, so the written
+          explanation cannot run here. The deadline, the case number, and the checklist are read
+          from your document and work on this device. The sample packets inside show the full
+          experience, including the explanation from a saved run of the same model.
         </p>
         <button
           onClick={onSkip}

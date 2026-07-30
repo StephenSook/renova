@@ -24,6 +24,21 @@
 /** Exact size of gemma-4-E2B-it-web.litertlm, verified against the source repo. */
 export const MODEL_BYTES = 2_008_432_640;
 
+/**
+ * Can this browser's GPU hold the model at all?
+ *
+ * WebGPU presence is not the real gate. iOS Safari 26 reports WebGPU with a
+ * ~716 MB maxBufferSize and a ~1.5 GB web-process ceiling, so an iPhone passes
+ * the feature check, downloads 2 GB, and then the tab is silently killed. That
+ * is the worst possible failure on the device a judge pulls out of a pocket.
+ * The adapter's maxBufferSize is the honest capability signal: below the model
+ * size, the live path can never work here, and the reader is told so before
+ * the download is ever offered rather than after it dies.
+ */
+export function modelFitsIn(maxBufferSize: number): boolean {
+  return maxBufferSize >= MODEL_BYTES;
+}
+
 export const MODEL_URL =
   'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.litertlm';
 

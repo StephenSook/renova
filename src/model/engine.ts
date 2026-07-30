@@ -20,6 +20,7 @@ import {
   type ConversationConfig,
   type EngineSettings,
 } from '@litert-lm/core';
+import { modelFitsIn } from './cache';
 
 /** Self-hosted by scripts/copy-wasm.mjs. Never point this at a CDN. */
 const WASM_PATH = `${import.meta.env.BASE_URL}litertlm-wasm/`;
@@ -42,6 +43,12 @@ export const MAX_OUTPUT_TOKENS = 220;
 
 export interface WebGpuStatus {
   supported: boolean;
+  /**
+   * Whether the adapter can hold the 2 GB model at all. False on iPhones,
+   * which report WebGPU support and then jetsam the tab. See modelFitsIn.
+   */
+  modelFits: boolean;
+  maxBufferSize?: number;
   reason?: string;
   adapterInfo?: string;
 }
@@ -59,6 +66,7 @@ export async function checkWebGpu(): Promise<WebGpuStatus> {
   if (!('gpu' in navigator)) {
     return {
       supported: false,
+      modelFits: false,
       reason: 'This browser does not support WebGPU. Chrome or Edge 113 and later do.',
     };
   }
@@ -67,16 +75,20 @@ export async function checkWebGpu(): Promise<WebGpuStatus> {
     if (!adapter) {
       return {
         supported: false,
+        modelFits: false,
         reason: 'WebGPU is present but no graphics adapter was available.',
       };
     }
     const info = (adapter as GPUAdapter & { info?: GPUAdapterInfo }).info;
+    const maxBufferSize = adapter.limits.maxBufferSize;
     return {
       supported: true,
+      modelFits: modelFitsIn(maxBufferSize),
+      maxBufferSize,
       adapterInfo: info ? [info.vendor, info.architecture].filter(Boolean).join(' ') : undefined,
     };
   } catch (err) {
-    return { supported: false, reason: `WebGPU probe failed: ${String(err)}` };
+    return { supported: false, modelFits: false, reason: `WebGPU probe failed: ${String(err)}` };
   }
 }
 
