@@ -11,11 +11,9 @@
 import type { Engine } from '@litert-lm/core';
 import { crossCheck, type Mismatch } from './engine/crosscheck';
 import { mergeMismatches } from './engine/prose';
-import { daysUntil } from './engine/dates';
-import { ES, enforceGlossary, isSpanishIntact } from './engine/glossary';
+import { enforceGlossary, isSpanishIntact } from './engine/glossary';
 import { SYSTEM_PROMPT, buildPrompt } from './engine/prompt';
 import { extract, normalize } from './engine/rules';
-import { NINETY_DAY_SENTENCE_EN, primaryHelpline } from './engine/states';
 import { ESCALATE, type ExtractionResult } from './engine/types';
 import { generate } from './model/engine';
 import { isLowQuality, readPages, type OcrPage } from './ocr/paddle';
@@ -201,26 +199,6 @@ export async function analyse(
 
 export { applyCachedProse } from './engine/prose';
 
-/**
- * The closing lines, rendered from code in both languages.
- *
- * These carry a legal right and a phone number, so the component that can
- * hallucinate is never the component that writes them.
- */
-export function closingLines(
-  fields: ExtractionResult,
-  language: 'en' | 'es',
-): { ninetyDay: string; help: string } {
-  const help = primaryHelpline(fields.state);
-  return language === 'es'
-    ? { ninetyDay: ES.ninetyDay, help: ES.callToday(help.name, help.number) }
-    : {
-        ninetyDay: NINETY_DAY_SENTENCE_EN,
-        help: `Call ${help.name} at ${help.number} if you have questions.`,
-      };
-}
-
-/** Days remaining, or null when the deadline could not be read. */
-export function urgency(fields: ExtractionResult): number | null {
-  return fields.deadline.value === ESCALATE ? null : daysUntil(fields.deadline.value);
-}
+// Pure rendering of the legal closing lines and the day count moved to the
+// engine so the iOS bridge shares them; re-exported to keep existing imports.
+export { closingLines, urgency } from './engine/prose';

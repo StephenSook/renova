@@ -92,6 +92,20 @@ Legend: **U** used · **Q** queued with a named trigger · **N** not applicable.
 
 ---
 
+## 10. Native iOS toolchain, added 2026-07-29 night
+
+The iOS build (ios/) brought its own tools, each U:
+
+| Tool | Role |
+|---|---|
+| Xcode 26.6 + iOS platform SDK | build, sign, archive |
+| xcodegen (brew, already installed) | ios/project.yml -> Renova.xcodeproj, project stays out of git |
+| esbuild (new devDependency) | bundles src/engine + demo cache + buildScript into renova-engine.js for JavaScriptCore |
+| JavaScriptCore (system) | runs the exact eval'd TypeScript rules engine on device; no Swift port exists |
+| LiteRT-LM Swift (SPM, google-ai-edge/LiteRT-LM) | native Gemma 4 E2B on Metal; pinned to a main revision because the v0.14.0 tag ships stale binary checksums |
+| Vision / VisionKit (system) | document camera + OCR, replacing PP-OCR wasm on iOS only; acceptance is the demo packets, the eval gates on text |
+| AVSpeechSynthesizer (system) | read-aloud, same voice-pick order as the web |
+
 ## What the full sweep changed
 
 Three decisions, all recorded in `tooling-audit.md`: the legal packs are a trap

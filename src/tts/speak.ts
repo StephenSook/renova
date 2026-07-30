@@ -23,7 +23,11 @@ import { formatLong } from '../engine/dates';
 import { DOCUMENT_LABELS_ES, ES, EN } from '../engine/glossary';
 import { NINETY_DAY_SENTENCE_EN, primaryHelpline } from '../engine/states';
 import { ESCALATE } from '../engine/types';
-import { closingLines, urgency, type Analysis } from '../pipeline';
+// closingLines and urgency come from the pure engine so this module can be
+// bundled for JavaScriptCore without dragging the wasm-touching pipeline in.
+// The Analysis import is type-only and erased at build time.
+import { closingLines, urgency } from '../engine/prose';
+import type { Analysis } from '../pipeline';
 
 export interface Voice {
   name: string;

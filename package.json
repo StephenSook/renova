@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "postinstall": "node scripts/copy-wasm.mjs && node scripts/fetch-ocr-models.mjs && node scripts/fetch-fonts.mjs",
     "eval": "vite-node eval/run.ts",
-    "assert-offline": "node scripts/assert-offline.mjs"
+    "assert-offline": "node scripts/assert-offline.mjs",
+    "ios:engine": "esbuild scripts/jsc-bundle-entry.ts --bundle --format=iife --target=safari16 --outfile=ios/Renova/Resources/renova-engine.js && cp public/demo/ny-01-form.png public/demo/ny-02-notice.png public/demo/ca-01-mc216.png public/demo/adversarial-injection.png ios/Renova/Resources/demo/"
   },
   "dependencies": {
     "@litert-lm/core": "^0.14.0",
@@ -28,6 +29,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "esbuild": "^0.28.1",
     "oxlint": "^1.71.0",
     "playwright": "^1.62.0",
     "typescript": "~6.0.2",

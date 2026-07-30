@@ -82,3 +82,9 @@ shots/
 # onnxruntime wasm, copied from node_modules by scripts/copy-wasm.mjs so the
 # app never fetches its runtime from a CDN. Not committed.
 public/ort/
+
+# iOS: generated project and generated/copied resources. Regenerate with
+# `xcodegen generate` (in ios/) and `npm run ios:engine`.
+ios/Renova.xcodeproj/
+ios/Renova/Resources/renova-engine.js
+ios/Renova/Resources/demo/

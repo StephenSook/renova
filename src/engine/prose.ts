@@ -6,7 +6,9 @@
  * ones, so the two cannot apply different scrutiny.
  */
 import { crossCheck, type Mismatch } from './crosscheck';
-import { enforceGlossary, isSpanishIntact } from './glossary';
+import { daysUntil } from './dates';
+import { ES, enforceGlossary, isSpanishIntact } from './glossary';
+import { NINETY_DAY_SENTENCE_EN, primaryHelpline } from './states';
 import { ESCALATE, type ExtractionResult } from './types';
 
 /** The slice of an analysis that prose attachment reads and writes. */
@@ -36,6 +38,31 @@ export function mergeMismatches(a: Mismatch[], b: Mismatch[]): Mismatch[] {
  * cache and the document disagree, the reader sees the same mismatch banner a
  * live run would show. The deterministic fields are untouched; that is the law.
  */
+/**
+ * The closing lines, rendered from code in both languages.
+ *
+ * These carry a legal right and a phone number, so the component that can
+ * hallucinate is never the component that writes them. They live here, in the
+ * pure engine, so the web pipeline and the iOS bridge render the same bytes.
+ */
+export function closingLines(
+  fields: ExtractionResult,
+  language: 'en' | 'es',
+): { ninetyDay: string; help: string } {
+  const help = primaryHelpline(fields.state);
+  return language === 'es'
+    ? { ninetyDay: ES.ninetyDay, help: ES.callToday(help.name, help.number) }
+    : {
+        ninetyDay: NINETY_DAY_SENTENCE_EN,
+        help: `Call ${help.name} at ${help.number} if you have questions.`,
+      };
+}
+
+/** Days remaining, or null when the deadline could not be read. */
+export function urgency(fields: ExtractionResult): number | null {
+  return fields.deadline.value === ESCALATE ? null : daysUntil(fields.deadline.value);
+}
+
 export function applyCachedProse<T extends ProseCarrier>(
   analysis: T,
   cached: { explanationEn: string; explanationEs: string },
