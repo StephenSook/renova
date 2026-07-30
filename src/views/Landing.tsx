@@ -132,7 +132,7 @@ export function Landing({
         <Panel
           kicker="The problem"
           title="The deadline is not where you think."
-          body="California prints it on the form. New York and Georgia put it on a separate notice. Pennsylvania puts it on the envelope. Photograph only the form in New York and you are holding paperwork with no visible date at all."
+          body="California prints it on the form. New York, Georgia, and Texas put it on a separate notice. Pennsylvania puts it on the envelope. Photograph only the form in New York and you are holding paperwork with no visible date at all."
         />
 
         {/* Three */}

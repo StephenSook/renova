@@ -7,7 +7,7 @@
  * boundary explicit in the type system rather than in a comment.
  */
 
-export type StateCode = 'CA' | 'NY' | 'PA' | 'GA';
+export type StateCode = 'CA' | 'NY' | 'PA' | 'GA' | 'TX';
 
 /**
  * Where the response deadline physically lives for a given state.

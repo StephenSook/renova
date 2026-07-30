@@ -18,15 +18,15 @@ and chronic disease treatment mid-course.
 The packet is the choke point. California's renewal is 19 pages. It is dense,
 deadline-driven, and frequently not in the reader's strongest language. And the
 single most important fact on it is not in a predictable place: **California
-prints the due date on the form, New York and Georgia put it on a separate cover
-notice, Pennsylvania puts it on the envelope.** New York's DOH-5798 has no
+prints the due date on the form, New York, Georgia, and Texas put it on a
+separate cover notice, Pennsylvania puts it on the envelope.** New York's DOH-5798 has no
 printed deadline anywhere on it. Someone who photographs only the form is holding
 paperwork that appears to have no deadline at all.
 
 I built this for two readers: the person at the kitchen table, and the navigator
-with a client in front of them. The strongest published evidence on reducing
-procedural disenrollment points at two levers, state-side ex parte automation and
-human assistance. This is the human-assistance lever, made faster and consistent.
+beside them. Published evidence points at two levers,
+state-side ex parte automation and human assistance. This is the
+human-assistance lever, made faster and consistent.
 
 ## What it does
 
@@ -51,7 +51,7 @@ photo -> PP-OCRv5 (onnxruntime-web) -> rules engine -> deadline, case number, do
 ```
 
 **The deterministic path owns the three fields a wrong answer could cost someone
-their coverage.** A table-driven TypeScript rules engine extracts them using nine
+their coverage.** A table-driven TypeScript rules engine extracts them using ten
 verbatim phrasing patterns collected from the states' own forms, per-state case
 number anchors, and a 16-category document taxonomy. Gemma writes the explanation
 and the Spanish prose and **may never overwrite those fields**. When the two
@@ -85,15 +85,15 @@ that reads the numbers.
 
 ## Evaluation
 
-`npm run eval` prints two tables and gates on both. Twelve text fixtures, all
+`npm run eval` prints two tables and gates on both. Fifteen text fixtures, all
 synthetic and watermarked, built from the states' published phrasing.
 
 | Field | Result |
 |---|---|
-| State detection | **12/12** |
-| Deadline | **12/12** (exact date, or ESCALATE where refusing is correct) |
-| Case number | **12/12** |
-| Required documents | **12/12** |
+| State detection | **15/15** |
+| Deadline | **15/15** (exact date, or ESCALATE where refusing is correct) |
+| Case number | **15/15** |
+| Required documents | **15/15** |
 
 Eight behavioural checks, pass or fail with no partial credit, all green:
 
@@ -104,7 +104,7 @@ Eight behavioural checks, pass or fail with no partial credit, all green:
 - disclaimer, in both languages, and the 90-day sentence exist as constants
 - no em-dashes in any reader-facing string
 
-Plus 44 unit tests. The harness earned itself immediately: it caught that Georgia
+Plus 68 unit tests. The harness earned itself immediately: it caught that Georgia
 asks for income proof without naming a source ("proof of any income you receive
 other than by working"), so the checklist was silently dropping a document the
 state had asked for.
@@ -173,10 +173,12 @@ visible.
    Michigan's redesigned form (73% to 96%) is the closest real support. The parts
    that do not depend on that claim carry the design: the deterministic deadline,
    the escalation numbers, and the 90-day line.
-2. Four states, and the demo documents are synthetic. Real packets are messier.
-3. Gemma is E2B, not a larger variant, because it must fit in a browser tab.
-4. Adjacent tools exist. Fortuna Health does guided online navigation; states run
-   portals; Propel runs renewal campaigns. None that I could verify does offline,
+2. Five states, synthetic demo documents; real packets are messier. Florida was
+   evaluated and deferred after a January 2026 federal ruling ordered its
+   notices rewritten; matching text in litigation flux is unsafe.
+3. Gemma is E2B because it must fit in a browser tab.
+4. Adjacent tools exist: Fortuna Health, state portals, Propel's renewal
+   campaigns. None that I could verify does offline,
    on-device packet comprehension with deterministically extracted safety fields.
    That combination is the claim, and nothing more.
 

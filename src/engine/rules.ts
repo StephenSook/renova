@@ -10,7 +10,7 @@
  * "We could not read your deadline, call this number today" is a useful sentence.
  * A confidently wrong date is the failure this whole product exists to prevent.
  */
-import { endOfRenewalMonth, parseDate } from './dates';
+import { endOfNumericMonth, endOfRenewalMonth, parseDate } from './dates';
 import { FEDERAL_FLOOR, STATES, primaryHelpline } from './states';
 import {
   ESCALATE,
@@ -57,6 +57,17 @@ const DEADLINE_ANTI_PATTERNS: RegExp[] = [
 
 /** "by the end of your renewal month" needs a month named somewhere nearby. */
 const RENEWAL_MONTH_RE = /\bby\s+the\s+end\s+of\s+(?:your|the)\s+renewal\s+month\b/i;
+
+/**
+ * Texas H1830-R, verbatim: "Your current health care benefits end MM/YYYY".
+ *
+ * This is checked BEFORE the generic patterns because the same notice prints a
+ * calendar date for SNAP ("It must be returned by 12/15/2024 if you want SNAP
+ * benefits"), and the generic return-by pattern would seize that date. For a
+ * Medicaid reader the month rule is the state's own phrasing; the SNAP date is
+ * a different program's clock.
+ */
+const TX_BENEFITS_END_RE = /\byour\s+current\s+health\s+care\s+benefits\s+end\s+(\d{1,2}\/\d{4})/i;
 
 interface DocumentRule {
   id: DocumentId;
@@ -116,12 +127,27 @@ const DOCUMENT_RULES: DocumentRule[] = [
   {
     id: 'immigration',
     label: 'Immigration documents, including your document or alien number',
-    triggers: [/\bimmigration\s+status\b/i, /\balien\s+number\b/i, /\bpermanent\s+resident\b/i],
+    triggers: [
+      /\bimmigration\s+status\b/i,
+      /\balien\s+number\b/i,
+      /\bpermanent\s+resident\b/i,
+      // Texas M5017: "Qualified Alien/Non-Citizenship Status - Alien
+      // registration card".
+      /\balien\s+registration\b/i,
+      /\bqualified\s+alien\b/i,
+    ],
   },
   {
     id: 'residency',
     label: 'Proof of where you live',
-    triggers: [/\bproof\s+of\s+residency\b/i, /\bproof\s+of\s+address\b/i],
+    triggers: [
+      /\bproof\s+of\s+residency\b/i,
+      /\bproof\s+of\s+address\b/i,
+      // Texas M5017: "Residence - Utility bills or utility company records,
+      // rent receipt or statement from non-relative landlord".
+      /\butility\s+bills?\b/i,
+      /\brent\s+receipts?\b/i,
+    ],
   },
   {
     id: 'household-changes',
@@ -131,7 +157,17 @@ const DOCUMENT_RULES: DocumentRule[] = [
   {
     id: 'resources',
     label: 'Bank statements and other account statements',
-    triggers: [/\bbank\s+statements?\b/i, /\bsavings\b/i, /\bchecking\s+account\b/i, /\bIRA\b|\b401[-\s]?K\b|\bKEOGH\b/i, /\bstocks?\s+(?:and|or)\s+bonds?\b/i],
+    triggers: [
+      /\bbank\s+statements?\b/i,
+      /\bsavings\b/i,
+      /\bchecking\s+account\b/i,
+      /\bIRA\b|\b401[-\s]?K\b|\bKEOGH\b/i,
+      /\bstocks?\s+(?:and|or)\s+bonds?\b/i,
+      // Texas H1830-R: "Bank accounts: Current statement for all accounts";
+      // M5017: "Stocks, Bonds, Trusts, Annuities".
+      /\bbank\s+accounts?\b/i,
+      /\bstocks?,\s*bonds?\b/i,
+    ],
   },
   {
     id: 'property-vehicles',
@@ -141,7 +177,12 @@ const DOCUMENT_RULES: DocumentRule[] = [
   {
     id: 'life-insurance',
     label: 'Life insurance policy information',
-    triggers: [/\blife\s+insurance\b/i, /\bcash\s+value\b/i],
+    triggers: [
+      /\blife\s+insurance\b/i,
+      /\bcash\s+value\b/i,
+      // Texas M5017: "Insurance Policies - Copies of life and burial policies".
+      /\blife\s+and\s+burial\s+polic/i,
+    ],
   },
   {
     id: 'burial',
@@ -161,7 +202,15 @@ const DOCUMENT_RULES: DocumentRule[] = [
   {
     id: 'work-hours',
     label: 'Proof of your work, school, or volunteer hours',
-    triggers: [/\bqualifying\s+(?:activit|hours)/i, /\b80\s+hours\b/i, /\bcommunity\s+engagement\b/i, /\bPathways\b/],
+    triggers: [
+      /\bqualifying\s+(?:activit|hours)/i,
+      /\b80\s+hours\b/i,
+      /\bcommunity\s+engagement\b/i,
+      /\bPathways\b/,
+      // Texas H1211 change-reporting list: "If the amount of hours a
+      // household member works changes."
+      /\bhours\s+a\s+household\s+member\s+works\b/i,
+    ],
   },
 ];
 
@@ -197,6 +246,14 @@ export function detectState(text: string): { state: StateCode | null; evidence?:
 
 export function extractDeadline(text: string, state: StateCode | null): Deadline {
   const flat = flatten(text);
+
+  const tx = TX_BENEFITS_END_RE.exec(flat);
+  if (tx) {
+    const resolved = endOfNumericMonth(tx[1]);
+    if (resolved) {
+      return { value: resolved.iso, evidence: tx[0].trim(), pattern: 'tx-benefits-end-month' };
+    }
+  }
 
   for (const { name, re } of DEADLINE_PATTERNS) {
     const match = re.exec(flat);

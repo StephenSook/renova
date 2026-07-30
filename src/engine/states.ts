@@ -147,6 +147,62 @@ export const STATES: Record<StateCode, StateRules> = {
     sources: ['PA 600 L', 'PA DHS glossary (90-day reconsideration, no gap)'],
   },
 
+  TX: {
+    code: 'TX',
+    programEn: 'Medicaid',
+    // H1830-RS prints the health-care checkbox as "Atención médica".
+    programEs: 'Medicaid (Atención médica)',
+    formCodes: ['H1010-R', 'H1010R', 'H1830-R', 'H1830R', 'H1211', 'M5017', 'H1858'],
+    stateAnchors: [
+      'Your Texas Benefits',
+      'Texas Health and Human Services',
+      'Texas Works',
+      'HHSC',
+    ],
+    // The due date and the case number both live on the H1830-R cover notice
+    // mailed on top of the H1010-R renewal form. For health care Texas prints
+    // a month, not a day: "Your current health care benefits end MM/YYYY".
+    // Only SNAP gets a calendar date.
+    deadlineCarrier: 'notice',
+    deadlineLocationEn:
+      'Your deadline is on the Renewal Notice (Form H1830-R) that came on top of your renewal form. For health care it is printed as the month your benefits end.',
+    deadlineLocationEs:
+      'Su fecha límite está en el Aviso de Renovación (Forma H1830-R) que vino encima de su formulario de renovación. Para atención médica aparece como el mes en que terminan sus beneficios.',
+    // The same packet uses two different labels: "CASE NO:" on the cover
+    // notice, "Case number:" on the H1010-R form. Spanish prints "Número de
+    // caso:"; the unaccented variant is here because OCR drops diacritics.
+    caseNumberLabels: ['CASE NO', 'Case number', 'Número de caso', 'Numero de caso'],
+    // Exactly 10 digits. This is also the guard that keeps the 9-digit
+    // per-program EDG numbers, which appear on the same pages, out of this
+    // field.
+    caseNumberPattern: /^\d{10}$/,
+    helpline: [
+      {
+        name: '2-1-1 Texas',
+        number: '2-1-1',
+        source: 'Form H1830-R: "Call: 2-1-1 toll-free (if you can\'t connect, call 1-877-541-7905)"',
+      },
+      {
+        name: 'Texas HHSC',
+        number: '1-877-541-7905',
+        source: 'Form H1830-R page 1 header (backup line)',
+      },
+      {
+        name: 'HHS Office of the Ombudsman',
+        number: '1-877-787-8999',
+        source: 'https://www.hhs.texas.gov/contact/complaints-appeals/hhs-office-ombudsman',
+      },
+    ],
+    reconsiderationEn:
+      'If you return your renewal within 90 days, Texas reopens your case starting the first of the month you send it in, with no new application.',
+    sources: [
+      'Form H1830-R (Texas Works Renewal Notice), May 2019 revision, mailed specimens 2023-2024',
+      'Form H1010-R, revision 10/2025 (hhs.texas.gov form landing page)',
+      'Form M5017 Documents To Send With Your Application (03/2021)',
+      'Texas Works Handbook E-2160 (90-day reopen; return date becomes the new file date)',
+    ],
+  },
+
   GA: {
     code: 'GA',
     programEn: 'Medicaid',

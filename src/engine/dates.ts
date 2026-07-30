@@ -96,6 +96,23 @@ export function endOfRenewalMonth(text: string): ParsedDate | null {
   return value ? { iso: value, text: m[0].trim() } : null;
 }
 
+/**
+ * Resolve Texas's month-only expiry ("Your current health care benefits end
+ * 08/2026") into the last day of that month. Texas prints no calendar day for
+ * Medicaid health care, so month-end is the only date that is not an
+ * invention, the same convention Georgia's renewal-month rule uses.
+ */
+export function endOfNumericMonth(mmYyyy: string): ParsedDate | null {
+  const m = /^(\d{1,2})\/(\d{4})$/.exec(mmYyyy.trim());
+  if (!m) return null;
+  const month = Number(m[1]);
+  const year = Number(m[2]);
+  if (month < 1 || month > 12) return null;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const value = iso(year, month, lastDay);
+  return value ? { iso: value, text: mmYyyy.trim() } : null;
+}
+
 /** Whole days from `from` to the ISO date. Negative once the date has passed. */
 export function daysUntil(isoDate: string, from = new Date()): number {
   const [y, m, d] = isoDate.split('-').map(Number);

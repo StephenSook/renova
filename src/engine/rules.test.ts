@@ -237,3 +237,56 @@ describe('buildEscalation', () => {
     expect(buildEscalation('NY', false)).toBeNull();
   });
 });
+
+describe('Texas', () => {
+  const NOTICE = `Texas Health and Human Services  Your Texas Benefits
+    Form H1830-R  Texas Works Renewal Notice
+    CASE NO: 1038391271
+    Health Care (EDG 687939621) Your current health care benefits end 08/2026.
+    It must be returned by 12/15/2026 if you want SNAP benefits 01/2027.`;
+
+  it('resolves the month-only health care deadline to month-end, beating the SNAP date', () => {
+    const r = extract([NOTICE]);
+    expect(r.state).toBe('TX');
+    expect(r.deadline.value).toBe('2026-08-31');
+    expect(r.deadline.pattern).toBe('tx-benefits-end-month');
+  });
+
+  it('reads the 10-digit case number and never the 9-digit EDG', () => {
+    const r = extract([NOTICE]);
+    expect(r.caseNumber.value).toBe('1038391271');
+    const formOnly = extract([
+      `Your Texas Benefits: Renewal Form H1010-R
+       Case number: 1058277426
+       Health Care EDG 687939621`,
+    ]);
+    expect(formOnly.caseNumber.value).toBe('1058277426');
+  });
+
+  it('accepts the Spanish case label, with and without the accent OCR drops', () => {
+    expect(extract([`Forma H1830-RS  Texas Works  Número de caso: 1038391271`]).caseNumber.value).toBe('1038391271');
+    expect(extract([`Forma H1830-RS  Texas Works  Numero de caso: 1038391271`]).caseNumber.value).toBe('1038391271');
+  });
+
+  it('escalates to the H1830-R notice when only the form was photographed', () => {
+    const r = extract([`Your Texas Benefits: Renewal Form H1010-R\nCase number: 1058277426`]);
+    expect(r.deadline.value).toBe('ESCALATE');
+    expect(r.missingDeadlineCarrier).toBe(true);
+    expect(r.escalation).toContain('H1830-R');
+    expect(r.escalation).toContain('2-1-1');
+  });
+
+  it('maps the M5017 and H1830-R wording onto the document taxonomy', () => {
+    const docs = extract([
+      `Form M5017 Texas Works Documents To Send
+       Bank accounts: Current statement for all accounts.
+       Insurance Policies - Copies of life and burial policies.
+       Residence - Utility bills or rent receipt.
+       Qualified Alien - Alien registration card.
+       If the amount of hours a household member works changes.`,
+    ]).documents.map((d) => d.id);
+    expect(docs).toEqual(
+      expect.arrayContaining(['resources', 'life-insurance', 'burial', 'residency', 'immigration', 'work-hours']),
+    );
+  });
+});

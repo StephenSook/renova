@@ -17,8 +17,9 @@ determination.
 ## Status
 
 Shipped and live at [renova-offline.vercel.app](https://renova-offline.vercel.app),
-no login. The eval harness gates 12/12 on all four safety fields and 8/8 on the
-behavioural checks (`npm run eval`), with 63 unit tests beside it. Three sample
+no login. Five states (CA, NY, PA, GA, TX), each encoded from its own published
+phrasing; the eval harness gates 15/15 on all four safety fields and 8/8 on the
+behavioural checks (`npm run eval`), with 68 unit tests beside it. Three sample
 packets ship in the app, so you can try the whole flow without downloading the
 2 GB model: their explanations were captured from this app's own engine at the
 same fixed settings the live path uses, are labelled as saved answers on screen,

@@ -229,4 +229,67 @@ export const CASES: EvalCase[] = [
       documents: ['work-hours'],
     },
   },
+
+  {
+    id: 'tx-h1830-notice',
+    intent:
+      'The common Texas case: the H1830-R cover notice carries a month-only health care deadline ("benefits end MM/YYYY") plus the case number. The month must resolve to month-end and must outrank any other date-like text.',
+    pages: [
+      `Texas Health and Human Services  Your Texas Benefits
+       Form H1830-R  Texas Works Renewal Notice
+       CASE NO: 1038391271
+       Due dates: Send your online renewal form or the form with this letter as
+       soon as you can. If we don't get your renewal in time, your benefits
+       might end.
+       Health Care (EDG 687939621) Your current health care benefits end 08/2026.
+       Items we need from you: Bring or mail copies of the items that apply to
+       your case. Bank accounts: Current statement for all accounts. Proof of
+       income: Last 4 pay stubs or a statement from your employer, or
+       self-employment records.
+       Call: 2-1-1 toll-free (if you can't connect, call 1-877-541-7905)
+       SAMPLE, NOT A REAL NOTICE`,
+    ],
+    expected: {
+      state: 'TX',
+      deadline: '2026-08-31',
+      caseNumber: '1038391271',
+      documents: ['earned-income', 'self-employment', 'resources'],
+    },
+  },
+
+  {
+    id: 'tx-form-only',
+    intent:
+      'The Texas failure mode, same shape as New York: only the H1010-R form was photographed, and the deadline lives on the H1830-R notice that was not. Refusing and naming the notice is the correct answer. The 10-digit case number must still be read, and the 9-digit EDG must never be mistaken for it.',
+    pages: [
+      `Your Texas Benefits: Renewal Form
+       Form H1010-R
+       Case number: 1058277426
+       Program Name EDG Number
+       Health Care EDG 687939621
+       Please review the information and sign the form.
+       SAMPLE, NOT A REAL NOTICE`,
+    ],
+    expected: { state: 'TX', deadline: 'ESCALATE', caseNumber: '1058277426', documents: [] },
+  },
+
+  {
+    id: 'tx-snap-explicit-date',
+    intent:
+      'Texas prints a calendar date only for SNAP. With no health care month sentence present, the explicit "must be returned by" date is the packet return date and is the correct extraction.',
+    pages: [
+      `Texas Health and Human Services  Form H1830-R
+       CASE NO: 1038391271
+       Your current SNAP food benefits end 12/2026. It's best to return this
+       form as soon as you can. It must be returned by 12/15/2026 if you want
+       SNAP benefits 01/2027.
+       SAMPLE, NOT A REAL NOTICE`,
+    ],
+    expected: {
+      state: 'TX',
+      deadline: '2026-12-15',
+      caseNumber: '1038391271',
+      documents: [],
+    },
+  },
 ];

@@ -126,7 +126,14 @@ export const EN = {
 /** Program name in Spanish, which differs by state. */
 export function programNameEs(state: StateCode | null): string {
   if (!state) return 'Medicaid';
-  return { CA: 'Medi-Cal', NY: 'Medicaid', GA: 'Medicaid', PA: 'Asistencia Médica' }[state];
+  // Texas H1830-RS prints the health-care checkbox as "Atención médica".
+  return {
+    CA: 'Medi-Cal',
+    NY: 'Medicaid',
+    GA: 'Medicaid',
+    PA: 'Asistencia Médica',
+    TX: 'Medicaid (Atención médica)',
+  }[state];
 }
 
 /**
