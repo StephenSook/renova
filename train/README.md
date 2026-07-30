@@ -69,18 +69,23 @@ teach behaviours no stock model has.
 
 ## Training
 
-Free Colab or Kaggle T4 is enough. Unsloth's own committed notebook output for
-this model on this GPU records 60 steps in 223 seconds at a 10.8 GB peak of
-14.5 GB available.
+The run that produced the published adapter is `train/modal_train.py`, headless
+on a Modal A10G with the plain Hugging Face stack (transformers 5.x, peft, trl).
+Unsloth was the obvious first choice and cost two failed runs on dependency
+resolution; the specifics are recorded at the top of that file, and the Colab
+script that used it has been deleted rather than left as a trap.
 
-1. Open a Colab notebook with a T4 runtime.
-2. `!pip install -q unsloth`, then restart the runtime.
-3. Upload `train/data/` and paste `train/finetune_gemma4_e2b.py`.
+```bash
+modal run --detach train/modal_train.py::smoke   # seconds, confirms the GPU
+modal run --detach train/modal_train.py::train   # the real run
+modal volume get renova-lora /adapter ./train/adapter
+```
 
-16-bit LoRA, r=16, language layers only, two epochs, trained on the assistant
-turn only via `train_on_responses_only`. Without that last part most of the
-gradient goes into reproducing our own prompt, which the model never needs to
-generate.
+bf16 LoRA, r=16, targeting the language stack's actual `nn.Linear` projection
+leaves (Gemma 4 wraps them in `Gemma4ClippableLinear`, which peft cannot wrap
+by bare suffix), two epochs. The published run: 770 seconds, 13.46 GB peak,
+before 3/4 and after 4/4 on the probes below, recorded in
+`train/adapter/eval.json`.
 
 A starting loss of 13 to 15 is normal for this model family and is not a bug.
 
